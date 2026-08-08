@@ -164,6 +164,8 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
 
   // ── 2. Content block ──────────────────────────────────────────────────────
 
+  const contentBlockHeight = 460.0;
+
   final leftColumn = pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.stretch,
     children: [
@@ -176,15 +178,17 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
         ),
         child: pw.Text('Betriebliche Tätigkeiten', style: _bold),
       ),
-      pw.Container(
-        constraints: const pw.BoxConstraints(minHeight: 200),
-        padding: _cellPadding,
-        decoration: const pw.BoxDecoration(
-          border: pw.Border(
-            bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
+      pw.Expanded(
+        child: pw.Container(
+          padding: _cellPadding,
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(
+              bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
+            ),
           ),
+          alignment: pw.Alignment.topLeft,
+          child: _itemList(eintrag.betriebliches),
         ),
-        child: _itemList(eintrag.betriebliches),
       ),
       pw.Container(
         padding: _cellPadding,
@@ -195,10 +199,12 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
         ),
         child: pw.Text('Schulische Tätigkeiten', style: _bold),
       ),
-      pw.Container(
-        constraints: const pw.BoxConstraints(minHeight: 180),
-        padding: _cellPadding,
-        child: _itemList(eintrag.schulisches),
+      pw.Expanded(
+        child: pw.Container(
+          padding: _cellPadding,
+          alignment: pw.Alignment.topLeft,
+          child: _itemList(eintrag.schulisches),
+        ),
       ),
     ],
   );
@@ -232,6 +238,7 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
   );
 
   final contentBlock = pw.Container(
+    height: contentBlockHeight,
     decoration: pw.BoxDecoration(
       border: pw.Border.all(width: 0.75, color: PdfColors.black),
     ),
@@ -309,7 +316,6 @@ pw.Page _buildDeckblattPage({int? ausbildungsjahr}) {
   // ── Info rows ─────────────────────────────────────────────────────────────
   final rows = [
     ('Ausbildungsjahr:', ausbildungsjahr?.toString() ?? ''),
-    ('Heft-Nr.:', ''),
     ('Name, Vorname:', 'Sayar, Arda Mehmet'),
     ('Adresse:', 'Hellgrund 4, 22880 Wedel'),
     ('Ausbildungsberuf:', 'Kaufmann für Büromanagement'),
