@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../models/eintrag.dart';
+import '../models/profil.dart';
 
 const _pageWidth = 595.28;
 const _pageHeight = 841.89;
@@ -56,7 +57,7 @@ pw.Widget _signatureBlock(String role) {
 
 // ── Private page builder ──────────────────────────────────────────────────────
 
-pw.Page _buildEintragPage(Eintrag eintrag) {
+pw.Page _buildEintragPage(Eintrag eintrag, Profil profil) {
   final dateFormat = DateFormat('dd.MM.yyyy');
 
   // ── Grid cell helper ──────────────────────────────────────────────────────
@@ -97,7 +98,7 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
           pw.Expanded(
             flex: 75,
             child: gridCell(
-              pw.Text('Sayar, Arda Mehmet', style: _normal),
+              pw.Text(profil.name, style: _normal),
               borderRight: false,
             ),
           ),
@@ -121,7 +122,7 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
           pw.Expanded(
             flex: 35,
             child: gridCell(
-              pw.Text('Büro / Sekretariat', style: _normal),
+              pw.Text(profil.ausbildungsbereich, style: _normal),
               borderRight: false,
             ),
           ),
@@ -290,7 +291,7 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
 
 // ── Cover page builder ────────────────────────────────────────────────────────
 
-pw.Page _buildDeckblattPage({int? ausbildungsjahr}) {
+pw.Page _buildDeckblattPage({int? ausbildungsjahr, required Profil profil}) {
   // ── Grid cell helper (same pattern as _buildEintragPage) ─────────────────
   pw.Widget gridCell(
     pw.Widget child, {
@@ -314,19 +315,31 @@ pw.Page _buildDeckblattPage({int? ausbildungsjahr}) {
   }
 
   // ── Info rows ─────────────────────────────────────────────────────────────
+  final dateFormat = DateFormat('dd.MM.yyyy');
+  final betriebFull = '${profil.betriebName}'
+      '${profil.betriebName.isNotEmpty && profil.betriebAdresse.isNotEmpty ? ", " : ""}'
+      '${profil.betriebAdresse}';
+
   final rows = [
     ('Ausbildungsjahr:', ausbildungsjahr?.toString() ?? ''),
-    ('Name, Vorname:', 'Sayar, Arda Mehmet'),
-    ('Adresse:', 'Hellgrund 4, 22880 Wedel'),
-    ('Ausbildungsberuf:', 'Kaufmann für Büromanagement'),
-    ('Fachrichtung/Schwerpunkt:', 'Auftragssteuerung / Assistenzaufgaben'),
+    ('Name, Vorname:', profil.name),
+    ('Adresse:', profil.adresse),
+    ('Ausbildungsberuf:', profil.ausbildungsberuf),
+    ('Fachrichtung/Schwerpunkt:', profil.fachrichtung),
+    ('Ausbildungsbetrieb:', betriebFull),
+    ('Verantwortliche/r Ausbilder/in:', profil.ausbilder),
     (
-      'Ausbildungsbetrieb:',
-      'WEKO Sicherheitsdienste GmbH, Sülldorfer Landstraße 199, 22589 Altona',
+      'Beginn der Ausbildung:',
+      profil.ausbildungsbeginn != null
+          ? dateFormat.format(profil.ausbildungsbeginn!)
+          : '',
     ),
-    ('Verantwortliche/r Ausbilder/in:', 'Ute Platzer'),
-    ('Beginn der Ausbildung:', '01.08.2026'),
-    ('Ende der Ausbildung:', '31.07.2029'),
+    (
+      'Ende der Ausbildung:',
+      profil.ausbildungsende != null
+          ? dateFormat.format(profil.ausbildungsende!)
+          : '',
+    ),
   ];
 
   final gridRows = <pw.Widget>[];
@@ -410,9 +423,9 @@ pw.Page _buildDeckblattPage({int? ausbildungsjahr}) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /// Generates a single-page PDF for one [Eintrag].
-Future<Uint8List> generateEintragPdf(Eintrag eintrag) async {
+Future<Uint8List> generateEintragPdf(Eintrag eintrag, Profil profil) async {
   final doc = pw.Document();
-  doc.addPage(_buildEintragPage(eintrag));
+  doc.addPage(_buildEintragPage(eintrag, profil));
   return doc.save();
 }
 
@@ -420,7 +433,8 @@ Future<Uint8List> generateEintragPdf(Eintrag eintrag) async {
 /// If [eintraege] is empty, returns a single-page PDF with a placeholder message.
 /// If [includeDeckblatt] is true and [eintraege] is non-empty, prepends a cover page.
 Future<Uint8List> generateEintraegeRangePdf(
-  List<Eintrag> eintraege, {
+  List<Eintrag> eintraege,
+  Profil profil, {
   bool includeDeckblatt = false,
 }) async {
   final doc = pw.Document();
@@ -441,11 +455,14 @@ Future<Uint8List> generateEintraegeRangePdf(
   } else {
     if (includeDeckblatt) {
       doc.addPage(
-        _buildDeckblattPage(ausbildungsjahr: eintraege.first.ausbildungsjahr),
+        _buildDeckblattPage(
+          ausbildungsjahr: eintraege.first.ausbildungsjahr,
+          profil: profil,
+        ),
       );
     }
     for (final eintrag in eintraege) {
-      doc.addPage(_buildEintragPage(eintrag));
+      doc.addPage(_buildEintragPage(eintrag, profil));
     }
   }
 

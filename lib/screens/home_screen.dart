@@ -5,6 +5,8 @@ import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../providers/eintraege_provider.dart';
+import '../providers/profil_provider.dart';
+import 'profil_screen.dart';
 import '../widgets/stichpunkt_liste.dart';
 import '../widgets/zusatz_bereich.dart';
 import '../widgets/notizen_feld.dart';
@@ -78,6 +80,17 @@ class HomeScreen extends ConsumerWidget {
             icon: const Icon(Icons.arrow_forward),
             tooltip: 'Nächste Woche',
             onPressed: () => _showNextWeekDialog(context, ref),
+          ),
+          IconButton(
+            icon: const Icon(Icons.person),
+            tooltip: 'Profil',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProfilScreen(isFirstSetup: false),
+                ),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -162,6 +175,18 @@ class HomeScreen extends ConsumerWidget {
                     icon: const Icon(Icons.picture_as_pdf),
                     label: const Text('PDF anzeigen'),
                     onPressed: () async {
+                      final profil = ref.read(profilProvider).value;
+                      if (profil == null) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Profil noch nicht geladen, bitte kurz warten'),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
                       showDialog(
                         context: context,
                         barrierDismissible: false,
@@ -171,7 +196,7 @@ class HomeScreen extends ConsumerWidget {
                       );
 
                       try {
-                        final pdfBytes = await generateEintragPdf(eintrag);
+                        final pdfBytes = await generateEintragPdf(eintrag, profil);
                         if (context.mounted) {
                           Navigator.of(context).pop(); // dismiss loading dialog
                         }
@@ -197,6 +222,18 @@ class HomeScreen extends ConsumerWidget {
                     icon: const Icon(Icons.date_range),
                     label: const Text('Zeitraum exportieren'),
                     onPressed: () async {
+                      final profil = ref.read(profilProvider).value;
+                      if (profil == null) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Profil noch nicht geladen, bitte kurz warten'),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
                       final maxDate = await fetchLatestBisDatum() ?? DateTime.now();
                       if (!context.mounted) return;
                       
@@ -262,6 +299,7 @@ class HomeScreen extends ConsumerWidget {
                         final eintraege = await fetchEintraegeInRange(range.start, range.end);
                         final pdfBytes = await generateEintraegeRangePdf(
                           eintraege,
+                          profil,
                           includeDeckblatt: includeDeckblatt,
                         );
                         if (context.mounted) {
