@@ -2,7 +2,6 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 
 import '../models/eintrag.dart';
 
@@ -16,19 +15,12 @@ double _y(double top) => _pageHeight - top;
 Future<Uint8List> generateEintragPdf(Eintrag eintrag) async {
   final dateFormat = DateFormat('dd.MM.yyyy');
 
-  // Load the template PDF from assets.
-  final templateBytes = await rootBundle.load('assets/berichtsheft_template.pdf');
-
-  // Rasterize the first page of the template at 2x resolution for a crisp background.
-  final rasterImages = Printing.raster(
-    templateBytes.buffer.asUint8List(),
-    pages: [0],
-    dpi: PdfPageFormat.inch * 2, // 144 DPI (2 × 72)
+  // Load the template PNG from assets.
+  final templateBytes = await rootBundle.load(
+    'assets/berichtsheft_template.png',
   );
 
-  final PdfRaster firstPageRaster = await rasterImages.first;
-  final backgroundImageData = await firstPageRaster.toPng();
-  final backgroundImage = pw.MemoryImage(backgroundImageData);
+  final backgroundImage = pw.MemoryImage(templateBytes.buffer.asUint8List());
 
   final doc = pw.Document();
 
@@ -43,10 +35,7 @@ Future<Uint8List> generateEintragPdf(Eintrag eintrag) async {
     return items.map((item) {
       return pw.Container(
         width: maxWidth,
-        child: pw.Text(
-          '• $item',
-          style: pw.TextStyle(fontSize: fontSize),
-        ),
+        child: pw.Text('• $item', style: pw.TextStyle(fontSize: fontSize)),
       );
     }).toList();
   }
@@ -73,7 +62,9 @@ Future<Uint8List> generateEintragPdf(Eintrag eintrag) async {
             // Von-Datum
             pw.Positioned(
               left: 194,
-              top: _pageHeight - _y(104), // top=104 → bottom-left origin: y = 841.89 - 104
+              top:
+                  _pageHeight -
+                  _y(104), // top=104 → bottom-left origin: y = 841.89 - 104
               child: pw.Text(
                 dateFormat.format(eintrag.vonDatum),
                 style: pw.TextStyle(fontSize: 9),
