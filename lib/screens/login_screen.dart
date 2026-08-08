@@ -253,7 +253,8 @@ class _PinBox extends StatelessWidget {
               borderSide: BorderSide(color: colorScheme.error, width: 2),
             ),
             filled: true,
-            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+            // ignore: deprecated_member_use
+            fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.4),
           ),
           onChanged: onChanged,
         ),
