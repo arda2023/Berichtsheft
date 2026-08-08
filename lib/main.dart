@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'providers/auth_provider.dart';
+import 'providers/eintraege_provider.dart';
 import 'providers/profil_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
@@ -27,6 +28,17 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authStateAsync = ref.watch(authStateProvider);
+
+    // Invalidate all user-scoped providers whenever the signed-in user changes
+    // (covers login, logout, and account switching).
+    ref.listen<AsyncValue<AuthState>>(authStateProvider, (previous, next) {
+      final previousUserId = previous?.value?.session?.user.id;
+      final nextUserId = next.value?.session?.user.id;
+      if (previousUserId != nextUserId) {
+        ref.invalidate(eintraegeProvider);
+        ref.invalidate(profilProvider);
+      }
+    });
 
     return MaterialApp(
       title: 'Berichtsheft',
