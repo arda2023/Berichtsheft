@@ -17,7 +17,7 @@ flutter doctor
 # Get dependencies
 flutter pub get
 
-# Build Flutter Web application using HTML renderer
-flutter build web --release --web-renderer html \
+# Build Flutter Web application using auto renderer
+flutter build web --release --web-renderer auto \
   --dart-define=SUPABASE_URL=$SUPABASE_URL \
   --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
