@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'providers/auth_provider.dart';
+import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
@@ -47,28 +48,6 @@ class MyApp extends ConsumerWidget {
           body: Center(child: Text('Error: $error')),
         ),
       ),
-    );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Berichtsheft'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
-            },
-          ),
-        ],
-      ),
-      body: const SizedBox.shrink(),
     );
   }
 }

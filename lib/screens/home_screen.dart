@@ -1,0 +1,178 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../providers/eintraege_provider.dart';
+import '../widgets/stichpunkt_liste.dart';
+import '../widgets/zusatz_bereich.dart';
+import '../services/pdf_service.dart';
+import 'package:printing/printing.dart';
+
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({super.key});
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString();
+    return '$day.$month.$year';
+  }
+
+  Future<void> _showNextWeekDialog(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nächste Woche'),
+        content: const Text(
+          'Aktuelle Woche abschließen und neue Woche beginnen?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Bestätigen'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      ref.read(eintraegeProvider.notifier).nextWeek();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final eintragAsync = ref.watch(eintraegeProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: eintragAsync.maybeWhen(
+          data: (eintrag) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Berichtsheft'),
+              Text(
+                '${_formatDate(eintrag.vonDatum)} – ${_formatDate(eintrag.bisDatum)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+          orElse: () => const Text('Berichtsheft'),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.arrow_forward),
+            tooltip: 'Nächste Woche',
+            onPressed: () => _showNextWeekDialog(context, ref),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Abmelden',
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+            },
+          ),
+        ],
+      ),
+      body: eintragAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(),
+        ),
+        error: (error, stackTrace) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Fehler beim Laden: $error',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => ref.invalidate(eintraegeProvider),
+                  child: const Text('Erneut versuchen'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        data: (eintrag) => SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              StichpunktListe(
+                label: 'Betriebliche Tätigkeiten',
+                items: eintrag.betriebliches,
+                onChanged: (items) {
+                  ref.read(eintraegeProvider.notifier).updateBetriebliches(items);
+                },
+              ),
+              const SizedBox(height: 24),
+              StichpunktListe(
+                label: 'Schulische Tätigkeiten',
+                items: eintrag.schulisches,
+                onChanged: (items) {
+                  ref.read(eintraegeProvider.notifier).updateSchulisches(items);
+                },
+              ),
+              const SizedBox(height: 24),
+              ZusatzBereich(
+                pauseMinuten: eintrag.pauseMinuten,
+                krankheitstage: eintrag.krankheitstage,
+                urlaubstage: eintrag.urlaubstage,
+                onChanged: ({pauseMinuten, krankheitstage, urlaubstage}) {
+                  ref.read(eintraegeProvider.notifier).updateZusatz(
+                        pauseMinuten: pauseMinuten,
+                        krankheitstage: krankheitstage,
+                        urlaubstage: urlaubstage,
+                      );
+                },
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.picture_as_pdf),
+                label: const Text('PDF anzeigen'),
+                onPressed: () async {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+
+                  try {
+                    final pdfBytes = await generateEintragPdf(eintrag);
+                    if (context.mounted) {
+                      Navigator.of(context).pop(); // dismiss loading dialog
+                    }
+                    await Printing.layoutPdf(
+                      onLayout: (format) async => pdfBytes,
+                    );
+                  } catch (e) {
+                    if (context.mounted) {
+                      Navigator.of(context).pop(); // dismiss loading dialog
+                    }
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Fehler bei der PDF-Erstellung: $e')),
+                      );
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
