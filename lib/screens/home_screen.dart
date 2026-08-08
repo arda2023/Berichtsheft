@@ -209,6 +209,45 @@ class HomeScreen extends ConsumerWidget {
                       
                       if (range == null) return;
 
+                      // Ask whether to include a cover page
+                      if (!context.mounted) return;
+                      final includeDeckblatt = await showDialog<bool>(
+                        context: context,
+                        builder: (context) {
+                          bool checked = false;
+                          return StatefulBuilder(
+                            builder: (context, setState) {
+                              return AlertDialog(
+                                title: const Text('Export-Optionen'),
+                                content: CheckboxListTile(
+                                  title: const Text('Deckblatt hinzufügen'),
+                                  value: checked,
+                                  onChanged: (value) {
+                                    setState(() => checked = value ?? false);
+                                  },
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(null),
+                                    child: const Text('Abbrechen'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(checked),
+                                    child: const Text('Exportieren'),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                      );
+
+                      if (includeDeckblatt == null) return;
+
                       if (context.mounted) {
                         showDialog(
                           context: context,
@@ -221,7 +260,10 @@ class HomeScreen extends ConsumerWidget {
 
                       try {
                         final eintraege = await fetchEintraegeInRange(range.start, range.end);
-                        final pdfBytes = await generateEintraegeRangePdf(eintraege);
+                        final pdfBytes = await generateEintraegeRangePdf(
+                          eintraege,
+                          includeDeckblatt: includeDeckblatt,
+                        );
                         if (context.mounted) {
                           Navigator.of(context).pop(); // dismiss loading dialog
                         }

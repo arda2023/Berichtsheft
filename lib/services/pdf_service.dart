@@ -281,6 +281,126 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
   );
 }
 
+// ── Cover page builder ────────────────────────────────────────────────────────
+
+pw.Page _buildDeckblattPage({int? ausbildungsjahr}) {
+  // ── Grid cell helper (same pattern as _buildEintragPage) ─────────────────
+  pw.Widget gridCell(
+    pw.Widget child, {
+    bool borderRight = true,
+    bool borderBottom = true,
+  }) {
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border(
+          right: borderRight
+              ? const pw.BorderSide(width: 0.75, color: PdfColors.black)
+              : pw.BorderSide.none,
+          bottom: borderBottom
+              ? const pw.BorderSide(width: 0.75, color: PdfColors.black)
+              : pw.BorderSide.none,
+        ),
+      ),
+      padding: _cellPadding,
+      child: child,
+    );
+  }
+
+  // ── Info rows ─────────────────────────────────────────────────────────────
+  final rows = [
+    ('Ausbildungsjahr:', ausbildungsjahr?.toString() ?? ''),
+    ('Heft-Nr.:', ''),
+    ('Name, Vorname:', 'Sayar, Arda Mehmet'),
+    ('Adresse:', 'Hellgrund 4, 22880 Wedel'),
+    ('Ausbildungsberuf:', 'Kaufmann für Büromanagement'),
+    ('Fachrichtung/Schwerpunkt:', 'Auftragssteuerung / Assistenzaufgaben'),
+    (
+      'Ausbildungsbetrieb:',
+      'WEKO Sicherheitsdienste GmbH, Sülldorfer Landstraße 199, 22589 Altona',
+    ),
+    ('Verantwortliche/r Ausbilder/in:', 'Ute Platzer'),
+    ('Beginn der Ausbildung:', '01.08.2026'),
+    ('Ende der Ausbildung:', '31.07.2029'),
+  ];
+
+  final gridRows = <pw.Widget>[];
+  for (int i = 0; i < rows.length; i++) {
+    final isLast = i == rows.length - 1;
+    gridRows.add(
+      pw.Row(children: [
+        pw.Expanded(
+          flex: 30,
+          child: gridCell(
+            pw.Text(rows[i].$1, style: _bold),
+            borderBottom: !isLast,
+          ),
+        ),
+        pw.Expanded(
+          flex: 70,
+          child: gridCell(
+            pw.Text(rows[i].$2, style: _normal),
+            borderRight: false,
+            borderBottom: !isLast,
+          ),
+        ),
+      ]),
+    );
+  }
+
+  final infoGrid = pw.Container(
+    decoration: pw.BoxDecoration(
+      border: pw.Border.all(width: 0.75, color: PdfColors.black),
+    ),
+    child: pw.Column(children: gridRows),
+  );
+
+  // ── Hinweise text ─────────────────────────────────────────────────────────
+  final hinweiseText = [
+    '1. Der ordnungsgemäß geführte Ausbildungsnachweis ist Zulassungsvoraussetzung zur Abschlussprüfung gemäß § 43 Abs. 1 Nr. 2 BBiG.',
+    '2. Für das Anfertigen des Ausbildungsnachweises gelten folgende Anforderungen:',
+    '- Der Ausbildungsnachweis ist in den gewerblich-technischen Ausbildungsberufen möglichst täglich, in den kaufmännischen Berufen möglichst wöchentlich zu führen.',
+    '- Jedes Blatt des Ausbildungsnachweises ist mit dem Namen des/der Auszubildenden, dem Ausbildungsjahr und dem Berichtszeitraum zu versehen.',
+    '- Der Ausbildungsnachweis muss mindestens stichwortartig den Inhalt der betrieblichen Ausbildung wiedergeben. Dabei sind betriebliche Tätigkeiten einerseits sowie Unterweisungen, betrieblicher Unterricht und sonstige Schulungen andererseits zu dokumentieren.',
+    '- In den Ausbildungsnachweis müssen darüber hinaus die Themen des Berufsschulunterrichts aufgenommen werden.',
+    '- Die ungefähre zeitliche Dauer der einzelnen Tätigkeiten sollte aus dem Ausbildungsnachweis hervorgehen.',
+    '3. Ausbildende oder Ausbilder/innen müssen die Eintragungen im Ausbildungsnachweis mindestens monatlich (§ 14 Abs. 1 Nr. 4 BBiG) prüfen und die Richtigkeit und Vollständigkeit der Eintragungen mit Datum und Unterschrift bestätigen. Sie tragen dafür Sorge, dass auch ein/e gesetzliche/r Vertreter/in und die Berufsschule in angemessenen Zeitabständen stichprobenartig von den Ausbildungsnachweisen Kenntnis erhalten und sie unterschriftlich bestätigen können.',
+  ];
+
+  return pw.Page(
+    pageFormat: const PdfPageFormat(_pageWidth, _pageHeight),
+    margin: pw.EdgeInsets.all(_margin),
+    build: (pw.Context context) {
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Center(
+            child: pw.Text(
+              'Ausbildungsnachweis',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+            ),
+          ),
+          pw.SizedBox(height: 20),
+          infoGrid,
+          pw.SizedBox(height: 20),
+          pw.Text('Hinweise:', style: _bold),
+          pw.SizedBox(height: 6),
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: hinweiseText
+                .map(
+                  (line) => pw.Padding(
+                    padding: const pw.EdgeInsets.only(bottom: 4),
+                    child: pw.Text(line, style: _small),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /// Generates a single-page PDF for one [Eintrag].
@@ -292,7 +412,11 @@ Future<Uint8List> generateEintragPdf(Eintrag eintrag) async {
 
 /// Generates a multi-page PDF with one page per entry in [eintraege].
 /// If [eintraege] is empty, returns a single-page PDF with a placeholder message.
-Future<Uint8List> generateEintraegeRangePdf(List<Eintrag> eintraege) async {
+/// If [includeDeckblatt] is true and [eintraege] is non-empty, prepends a cover page.
+Future<Uint8List> generateEintraegeRangePdf(
+  List<Eintrag> eintraege, {
+  bool includeDeckblatt = false,
+}) async {
   final doc = pw.Document();
 
   if (eintraege.isEmpty) {
@@ -309,6 +433,11 @@ Future<Uint8List> generateEintraegeRangePdf(List<Eintrag> eintraege) async {
       ),
     );
   } else {
+    if (includeDeckblatt) {
+      doc.addPage(
+        _buildDeckblattPage(ausbildungsjahr: eintraege.first.ausbildungsjahr),
+      );
+    }
     for (final eintrag in eintraege) {
       doc.addPage(_buildEintragPage(eintrag));
     }
@@ -316,3 +445,4 @@ Future<Uint8List> generateEintraegeRangePdf(List<Eintrag> eintraege) async {
 
   return doc.save();
 }
+
