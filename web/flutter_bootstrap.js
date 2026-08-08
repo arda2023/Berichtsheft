@@ -26,6 +26,7 @@ document.body.appendChild(loadingDiv);
 
 _flutter.loader.load({
   config: {
+    renderer: "skwasm",
     forceSingleThreadedSkwasm: true,
     canvasKitMaximumSurfaces: 8,
   },
