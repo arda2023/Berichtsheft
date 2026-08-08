@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../providers/eintraege_provider.dart';
 import '../widgets/stichpunkt_liste.dart';
 import '../widgets/zusatz_bereich.dart';
 import '../services/pdf_service.dart';
-import 'package:printing/printing.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -154,8 +155,11 @@ class HomeScreen extends ConsumerWidget {
                     if (context.mounted) {
                       Navigator.of(context).pop(); // dismiss loading dialog
                     }
-                    await Printing.layoutPdf(
-                      onLayout: (format) async => pdfBytes,
+                    final filename =
+                        'berichtsheft_${DateFormat('yyyy-MM-dd').format(eintrag.vonDatum)}.pdf';
+                    await Printing.sharePdf(
+                      bytes: pdfBytes,
+                      filename: filename,
                     );
                   } catch (e) {
                     if (context.mounted) {

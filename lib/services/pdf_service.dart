@@ -1,147 +1,210 @@
-import 'package:flutter/services.dart';
+import 'dart:typed_data';
+
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../models/eintrag.dart';
 
-/// A4 page dimensions in PDF points.
 const _pageWidth = 595.28;
 const _pageHeight = 841.89;
-
-/// Convert a top-based Y coordinate (from page top) to PDF bottom-based Y.
-double _y(double top) => _pageHeight - top;
+const _margin = 36.0;
 
 Future<Uint8List> generateEintragPdf(Eintrag eintrag) async {
   final dateFormat = DateFormat('dd.MM.yyyy');
-
-  // Load the template PNG from assets.
-  final templateBytes = await rootBundle.load(
-    'assets/berichtsheft_template.png',
-  );
-
-  final backgroundImage = pw.MemoryImage(templateBytes.buffer.asUint8List());
-
   final doc = pw.Document();
 
-  // Helper: build a bullet list as a column of text widgets.
-  List<pw.Widget> bulletLines(
-    List<String> items, {
-    double fontSize = 9,
-    double lineHeight = 13,
-    double maxWidth = 370,
-  }) {
-    if (items.isEmpty) return [];
-    return items.map((item) {
-      return pw.Container(
-        width: maxWidth,
-        child: pw.Text('• $item', style: pw.TextStyle(fontSize: fontSize)),
-      );
-    }).toList();
+  final borderAll = pw.TableBorder.all(width: 0.75, color: PdfColors.black);
+  final cellPadding = const pw.EdgeInsets.all(4);
+
+  final bold = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
+  final normal = pw.TextStyle(fontSize: 9);
+  final small = pw.TextStyle(fontSize: 8);
+
+  // ── Helper: standard labelled cell ──────────────────────────────────────
+  pw.Widget labelCell(String text, {pw.TextStyle? style}) => pw.Padding(
+    padding: cellPadding,
+    child: pw.Text(text, style: style ?? bold),
+  );
+
+  pw.Widget valueCell(String text, {pw.TextStyle? style}) => pw.Padding(
+    padding: cellPadding,
+    child: pw.Text(text, style: style ?? normal),
+  );
+
+  // ── 1. Header table ──────────────────────────────────────────────────────
+  final headerTable = pw.Table(
+    border: borderAll,
+    columnWidths: {
+      0: const pw.FixedColumnWidth(120),
+      1: const pw.FlexColumnWidth(2),
+      2: const pw.FixedColumnWidth(110),
+      3: const pw.FlexColumnWidth(2),
+    },
+    children: [
+      // Row 1: Name
+      pw.TableRow(
+        children: [
+          labelCell('Name, Vorname:'),
+          pw.TableCell(columnSpan: 3, child: valueCell('Sayar, Arda Mehmet')),
+        ],
+      ),
+      // Row 2: Ausbildungsjahr + Ausbildungsbereich
+      pw.TableRow(
+        children: [
+          labelCell('Ausbildungsjahr:'),
+          valueCell(eintrag.ausbildungsjahr.toString()),
+          labelCell('Ausbildungsbereich:'),
+          valueCell('Büro / Sekretariat'),
+        ],
+      ),
+      // Row 3: Ausbildungswoche + Bis
+      pw.TableRow(
+        children: [
+          labelCell('Ausbildungswoche:'),
+          valueCell(dateFormat.format(eintrag.vonDatum)),
+          labelCell('Bis:'),
+          valueCell(dateFormat.format(eintrag.bisDatum)),
+        ],
+      ),
+    ],
+  );
+
+  // ── Helper: item list (hyphen prefix) ───────────────────────────────────
+  pw.Widget itemList(List<String> items, {double fontSize = 9}) {
+    if (items.isEmpty) {
+      return pw.SizedBox();
+    }
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: items
+          .map(
+            (item) => pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 2),
+              child: pw.Text(
+                '- $item',
+                style: pw.TextStyle(fontSize: fontSize),
+              ),
+            ),
+          )
+          .toList(),
+    );
   }
 
+  // ── Zusatz content ────────────────────────────────────────────────────────
+  final zusatzContent = pw.Padding(
+    padding: cellPadding,
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Pause: ${eintrag.pauseMinuten} Min', style: small),
+        pw.SizedBox(height: 4),
+        pw.Text('Krank: ${eintrag.krankheitstage} Tg', style: small),
+        pw.SizedBox(height: 4),
+        pw.Text('Urlaub: ${eintrag.urlaubstage} Tg', style: small),
+      ],
+    ),
+  );
+
+  // ── 2. Main content table ────────────────────────────────────────────────
+  final contentTable = pw.Table(
+    border: borderAll,
+    columnWidths: {
+      0: const pw.FlexColumnWidth(5),
+      1: const pw.FixedColumnWidth(90),
+    },
+    children: [
+      // Header: Betriebliche Tätigkeiten | Zusatz
+      pw.TableRow(
+        children: [
+          pw.Padding(
+            padding: cellPadding,
+            child: pw.Text('Betriebliche Tätigkeiten', style: bold),
+          ),
+          pw.Padding(
+            padding: cellPadding,
+            child: pw.Text('Zusatz', style: bold),
+          ),
+        ],
+      ),
+      // Content: betriebliches list | zusatz values
+      pw.TableRow(
+        children: [
+          pw.Container(
+            constraints: const pw.BoxConstraints(minHeight: 220),
+            padding: cellPadding,
+            child: itemList(eintrag.betriebliches),
+          ),
+          pw.Container(
+            constraints: const pw.BoxConstraints(minHeight: 220),
+            child: zusatzContent,
+          ),
+        ],
+      ),
+      // Header: Schulische Tätigkeiten
+      pw.TableRow(
+        children: [
+          pw.Padding(
+            padding: cellPadding,
+            child: pw.Text('Schulische Tätigkeiten', style: bold),
+          ),
+          pw.SizedBox(), // empty right cell
+        ],
+      ),
+      // Content: schulisches list
+      pw.TableRow(
+        children: [
+          pw.Container(
+            constraints: const pw.BoxConstraints(minHeight: 200),
+            padding: cellPadding,
+            child: itemList(eintrag.schulisches),
+          ),
+          pw.SizedBox(), // empty right cell
+        ],
+      ),
+    ],
+  );
+
+  // ── 3. Signature row ─────────────────────────────────────────────────────
+  pw.Widget signatureBlock(String role) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Container(
+          width: 180,
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(
+              bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
+            ),
+          ),
+          height: 30,
+        ),
+        pw.SizedBox(height: 4),
+        pw.Text('Datum, Unterschrift', style: pw.TextStyle(fontSize: 8)),
+        pw.Text(role, style: pw.TextStyle(fontSize: 8)),
+      ],
+    );
+  }
+
+  final signatureRow = pw.Row(
+    mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+    children: [signatureBlock('Auszubildender'), signatureBlock('Ausbilderin')],
+  );
+
+  // ── Assemble page ────────────────────────────────────────────────────────
   doc.addPage(
     pw.Page(
       pageFormat: const PdfPageFormat(_pageWidth, _pageHeight),
-      margin: pw.EdgeInsets.zero,
+      margin: pw.EdgeInsets.all(_margin),
       build: (pw.Context context) {
-        return pw.Stack(
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
-            // Background: template as full-page raster image.
-            pw.Positioned(
-              left: 0,
-              top: 0,
-              child: pw.Image(
-                backgroundImage,
-                width: _pageWidth,
-                height: _pageHeight,
-                fit: pw.BoxFit.fill,
-              ),
-            ),
-
-            // Von-Datum
-            pw.Positioned(
-              left: 194,
-              top:
-                  _pageHeight -
-                  _y(104), // top=104 → bottom-left origin: y = 841.89 - 104
-              child: pw.Text(
-                dateFormat.format(eintrag.vonDatum),
-                style: pw.TextStyle(fontSize: 9),
-              ),
-            ),
-
-            // Bis-Datum
-            pw.Positioned(
-              left: 293,
-              top: _pageHeight - _y(104),
-              child: pw.Text(
-                dateFormat.format(eintrag.bisDatum),
-                style: pw.TextStyle(fontSize: 9),
-              ),
-            ),
-
-            // Betriebliche Tätigkeiten block
-            pw.Positioned(
-              left: 76,
-              top: _pageHeight - _y(155),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: bulletLines(
-                  eintrag.betriebliches,
-                  fontSize: 9,
-                  lineHeight: 13,
-                  maxWidth: 370,
-                ),
-              ),
-            ),
-
-            // Schulische Tätigkeiten block
-            pw.Positioned(
-              left: 76,
-              top: _pageHeight - _y(389),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: bulletLines(
-                  eintrag.schulisches,
-                  fontSize: 9,
-                  lineHeight: 13,
-                  maxWidth: 370,
-                ),
-              ),
-            ),
-
-            // Zusatz block: Pause, Krank, Urlaub
-            pw.Positioned(
-              left: 458,
-              top: _pageHeight - _y(155),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Container(
-                    width: 100,
-                    child: pw.Text(
-                      'Pause: ${eintrag.pauseMinuten} Min',
-                      style: pw.TextStyle(fontSize: 8),
-                    ),
-                  ),
-                  pw.Container(
-                    width: 100,
-                    child: pw.Text(
-                      'Krank: ${eintrag.krankheitstage} Tg',
-                      style: pw.TextStyle(fontSize: 8),
-                    ),
-                  ),
-                  pw.Container(
-                    width: 100,
-                    child: pw.Text(
-                      'Urlaub: ${eintrag.urlaubstage} Tg',
-                      style: pw.TextStyle(fontSize: 8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            headerTable,
+            pw.SizedBox(height: 15),
+            contentTable,
+            pw.SizedBox(height: 100),
+            signatureRow,
           ],
         );
       },
