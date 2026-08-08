@@ -138,40 +138,97 @@ class HomeScreen extends ConsumerWidget {
                 },
               ),
               const SizedBox(height: 24),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.picture_as_pdf),
-                label: const Text('PDF anzeigen'),
-                onPressed: () async {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-
-                  try {
-                    final pdfBytes = await generateEintragPdf(eintrag);
-                    if (context.mounted) {
-                      Navigator.of(context).pop(); // dismiss loading dialog
-                    }
-                    final filename =
-                        'berichtsheft_${DateFormat('yyyy-MM-dd').format(eintrag.vonDatum)}.pdf';
-                    await Printing.sharePdf(
-                      bytes: pdfBytes,
-                      filename: filename,
-                    );
-                  } catch (e) {
-                    if (context.mounted) {
-                      Navigator.of(context).pop(); // dismiss loading dialog
-                    }
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Fehler bei der PDF-Erstellung: $e')),
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                alignment: WrapAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text('PDF anzeigen'),
+                    onPressed: () async {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(
+                          child: CircularProgressIndicator(),
+                        ),
                       );
-                    }
-                  }
-                },
+
+                      try {
+                        final pdfBytes = await generateEintragPdf(eintrag);
+                        if (context.mounted) {
+                          Navigator.of(context).pop(); // dismiss loading dialog
+                        }
+                        final filename =
+                            'berichtsheft_${DateFormat('yyyy-MM-dd').format(eintrag.vonDatum)}.pdf';
+                        await Printing.sharePdf(
+                          bytes: pdfBytes,
+                          filename: filename,
+                        );
+                      } catch (e) {
+                        if (context.mounted) {
+                          Navigator.of(context).pop(); // dismiss loading dialog
+                        }
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Fehler bei der PDF-Erstellung: $e')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.date_range),
+                    label: const Text('Zeitraum exportieren'),
+                    onPressed: () async {
+                      final maxDate = await fetchLatestBisDatum() ?? DateTime.now();
+                      if (!context.mounted) return;
+                      
+                      final range = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2026, 1, 1),
+                        lastDate: maxDate,
+                        initialDateRange: null,
+                      );
+                      
+                      if (range == null) return;
+
+                      if (context.mounted) {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+
+                      try {
+                        final eintraege = await fetchEintraegeInRange(range.start, range.end);
+                        final pdfBytes = await generateEintraegeRangePdf(eintraege);
+                        if (context.mounted) {
+                          Navigator.of(context).pop(); // dismiss loading dialog
+                        }
+                        final filename =
+                            'berichtsheft_${DateFormat('yyyy-MM-dd').format(range.start)}_bis_${DateFormat('yyyy-MM-dd').format(range.end)}.pdf';
+                        await Printing.sharePdf(
+                          bytes: pdfBytes,
+                          filename: filename,
+                        );
+                      } catch (e) {
+                        if (context.mounted) {
+                          Navigator.of(context).pop(); // dismiss loading dialog
+                        }
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Fehler beim Zeitraum-Export: $e')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ],
               ),
             ],
           ),

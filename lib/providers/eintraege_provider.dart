@@ -178,3 +178,47 @@ class EintraegeNotifier extends AsyncNotifier<Eintrag> {
 final eintraegeProvider = AsyncNotifierProvider<EintraegeNotifier, Eintrag>(
   EintraegeNotifier.new,
 );
+
+Future<List<Eintrag>> fetchEintraegeInRange(DateTime von, DateTime bis) async {
+  final client = Supabase.instance.client;
+  final user = client.auth.currentUser;
+
+  if (user == null) {
+    return [];
+  }
+
+  final response = await client
+      .from('eintraege')
+      .select()
+      .eq('user_id', user.id)
+      .gte('von_datum', von.toIso8601String())
+      .lte('bis_datum', bis.toIso8601String())
+      .order('von_datum', ascending: true);
+
+  return (response as List)
+      .map((row) => Eintrag.fromJson(row as Map<String, dynamic>))
+      .toList();
+}
+
+Future<DateTime?> fetchLatestBisDatum() async {
+  final client = Supabase.instance.client;
+  final user = client.auth.currentUser;
+
+  if (user == null) {
+    return null;
+  }
+
+  final response = await client
+      .from('eintraege')
+      .select('bis_datum')
+      .eq('user_id', user.id)
+      .order('bis_datum', ascending: false)
+      .limit(1)
+      .maybeSingle();
+
+  if (response == null) {
+    return null;
+  }
+
+  return DateTime.parse(response['bis_datum'] as String);
+}
