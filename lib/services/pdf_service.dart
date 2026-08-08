@@ -12,23 +12,12 @@ const _margin = 36.0;
 
 // ── Shared styles & constants ─────────────────────────────────────────────────
 
-final _borderAll = pw.TableBorder.all(width: 0.75, color: PdfColors.black);
 const _cellPadding = pw.EdgeInsets.all(4);
 final _bold = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
 final _normal = pw.TextStyle(fontSize: 9);
 final _small = pw.TextStyle(fontSize: 8);
 
 // ── Shared helper widgets ─────────────────────────────────────────────────────
-
-pw.Widget _labelCell(String text, {pw.TextStyle? style}) => pw.Padding(
-      padding: _cellPadding,
-      child: pw.Text(text, style: style ?? _bold),
-    );
-
-pw.Widget _valueCell(String text, {pw.TextStyle? style}) => pw.Padding(
-      padding: _cellPadding,
-      child: pw.Text(text, style: style ?? _normal),
-    );
 
 pw.Widget _itemList(List<String> items, {double fontSize = 9}) {
   if (items.isEmpty) return pw.SizedBox();
@@ -70,107 +59,202 @@ pw.Widget _signatureBlock(String role) {
 pw.Page _buildEintragPage(Eintrag eintrag) {
   final dateFormat = DateFormat('dd.MM.yyyy');
 
-  // 1. Header table
-  final headerTable = pw.Table(
-    border: _borderAll,
-    columnWidths: {
-      0: const pw.FixedColumnWidth(120),
-      1: const pw.FlexColumnWidth(2),
-      2: const pw.FixedColumnWidth(110),
-      3: const pw.FlexColumnWidth(2),
-    },
-    children: [
-      // Row 1: Name
-      pw.TableRow(children: [
-        _labelCell('Name, Vorname:'),
-        _valueCell('Sayar, Arda Mehmet'),
-        pw.SizedBox(),
-        pw.SizedBox(),
-      ]),
-      // Row 2: Ausbildungsjahr + Ausbildungsbereich
-      pw.TableRow(children: [
-        _labelCell('Ausbildungsjahr:'),
-        _valueCell(eintrag.ausbildungsjahr.toString()),
-        _labelCell('Ausbildungsbereich:'),
-        _valueCell('Büro / Sekretariat'),
-      ]),
-      // Row 3: Ausbildungswoche + Bis
-      pw.TableRow(children: [
-        _labelCell('Ausbildungswoche:'),
-        _valueCell(dateFormat.format(eintrag.vonDatum)),
-        _labelCell('Bis:'),
-        _valueCell(dateFormat.format(eintrag.bisDatum)),
-      ]),
-    ],
-  );
+  // ── Grid cell helper ──────────────────────────────────────────────────────
+  pw.Widget gridCell(
+    pw.Widget child, {
+    bool borderRight = true,
+    bool borderBottom = true,
+  }) {
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border(
+          right: borderRight
+              ? const pw.BorderSide(width: 0.75, color: PdfColors.black)
+              : pw.BorderSide.none,
+          bottom: borderBottom
+              ? const pw.BorderSide(width: 0.75, color: PdfColors.black)
+              : pw.BorderSide.none,
+        ),
+      ),
+      padding: _cellPadding,
+      child: child,
+    );
+  }
 
-  // Zusatz content
-  final zusatzContent = pw.Padding(
-    padding: _cellPadding,
+  // ── 1. Header block ───────────────────────────────────────────────────────
+  final headerBlock = pw.Container(
+    decoration: pw.BoxDecoration(
+      border: pw.Border.all(width: 0.75, color: PdfColors.black),
+    ),
     child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('Pause: ${eintrag.pauseMinuten} Min', style: _small),
-        pw.SizedBox(height: 4),
-        pw.Text('Krank: ${eintrag.krankheitstage} Tg', style: _small),
-        pw.SizedBox(height: 4),
-        pw.Text('Urlaub: ${eintrag.urlaubstage} Tg', style: _small),
+        // Row 1: Name (spans full width)
+        pw.Row(children: [
+          pw.Expanded(
+            flex: 25,
+            child: gridCell(pw.Text('Name, Vorname:', style: _bold)),
+          ),
+          pw.Expanded(
+            flex: 75,
+            child: gridCell(
+              pw.Text('Sayar, Arda Mehmet', style: _normal),
+              borderRight: false,
+            ),
+          ),
+        ]),
+        // Row 2: Ausbildungsjahr + Ausbildungsbereich
+        pw.Row(children: [
+          pw.Expanded(
+            flex: 25,
+            child: gridCell(pw.Text('Ausbildungsjahr:', style: _bold)),
+          ),
+          pw.Expanded(
+            flex: 12,
+            child: gridCell(
+              pw.Text(eintrag.ausbildungsjahr.toString(), style: _normal),
+            ),
+          ),
+          pw.Expanded(
+            flex: 28,
+            child: gridCell(pw.Text('Ausbildungsbereich:', style: _bold)),
+          ),
+          pw.Expanded(
+            flex: 35,
+            child: gridCell(
+              pw.Text('Büro / Sekretariat', style: _normal),
+              borderRight: false,
+            ),
+          ),
+        ]),
+        // Row 3: Ausbildungswoche + Bis (no bottom border — last row)
+        pw.Row(children: [
+          pw.Expanded(
+            flex: 25,
+            child: gridCell(
+              pw.Text('Ausbildungswoche:', style: _bold),
+              borderBottom: false,
+            ),
+          ),
+          pw.Expanded(
+            flex: 20,
+            child: gridCell(
+              pw.Text(dateFormat.format(eintrag.vonDatum), style: _normal),
+              borderBottom: false,
+            ),
+          ),
+          pw.Expanded(
+            flex: 8,
+            child: gridCell(
+              pw.Text('Bis:', style: _bold),
+              borderBottom: false,
+            ),
+          ),
+          pw.Expanded(
+            flex: 47,
+            child: gridCell(
+              pw.Text(dateFormat.format(eintrag.bisDatum), style: _normal),
+              borderRight: false,
+              borderBottom: false,
+            ),
+          ),
+        ]),
       ],
     ),
   );
 
-  // 2. Main content table
-  final contentTable = pw.Table(
-    border: _borderAll,
-    columnWidths: {
-      0: const pw.FlexColumnWidth(5),
-      1: const pw.FixedColumnWidth(90),
-    },
+  // ── 2. Content block ──────────────────────────────────────────────────────
+
+  final leftColumn = pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
     children: [
-      // Header: Betriebliche Tätigkeiten | Zusatz
-      pw.TableRow(children: [
-        pw.Padding(
-          padding: _cellPadding,
-          child: pw.Text('Betriebliche Tätigkeiten', style: _bold),
+      pw.Container(
+        padding: _cellPadding,
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(
+            bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
+          ),
         ),
-        pw.Padding(
-          padding: _cellPadding,
-          child: pw.Text('Zusatz', style: _bold),
+        child: pw.Text('Betriebliche Tätigkeiten', style: _bold),
+      ),
+      pw.Container(
+        constraints: const pw.BoxConstraints(minHeight: 200),
+        padding: _cellPadding,
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(
+            bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
+          ),
         ),
-      ]),
-      // Content: betriebliches list | zusatz values
-      pw.TableRow(children: [
-        pw.Container(
-          constraints: const pw.BoxConstraints(minHeight: 220),
-          padding: _cellPadding,
-          child: _itemList(eintrag.betriebliches),
+        child: _itemList(eintrag.betriebliches),
+      ),
+      pw.Container(
+        padding: _cellPadding,
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(
+            bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
+          ),
         ),
-        pw.Container(
-          constraints: const pw.BoxConstraints(minHeight: 220),
-          child: zusatzContent,
-        ),
-      ]),
-      // Header: Schulische Tätigkeiten
-      pw.TableRow(children: [
-        pw.Padding(
-          padding: _cellPadding,
-          child: pw.Text('Schulische Tätigkeiten', style: _bold),
-        ),
-        pw.SizedBox(),
-      ]),
-      // Content: schulisches list
-      pw.TableRow(children: [
-        pw.Container(
-          constraints: const pw.BoxConstraints(minHeight: 200),
-          padding: _cellPadding,
-          child: _itemList(eintrag.schulisches),
-        ),
-        pw.SizedBox(),
-      ]),
+        child: pw.Text('Schulische Tätigkeiten', style: _bold),
+      ),
+      pw.Container(
+        constraints: const pw.BoxConstraints(minHeight: 180),
+        padding: _cellPadding,
+        child: _itemList(eintrag.schulisches),
+      ),
     ],
   );
 
-  // 3. Signature row
+  final rightColumn = pw.Container(
+    padding: _cellPadding,
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Zusatz', style: _bold),
+        pw.SizedBox(height: 6),
+        pw.Text('Pause: ${eintrag.pauseMinuten} Min', style: _small),
+        pw.SizedBox(height: 2),
+        pw.Text('Krank: ${eintrag.krankheitstage} Tg', style: _small),
+        pw.SizedBox(height: 2),
+        pw.Text('Urlaub: ${eintrag.urlaubstage} Tg', style: _small),
+        if (eintrag.notizen.isNotEmpty) ...[
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'Notizen:',
+            style: pw.TextStyle(
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 2),
+          pw.Text(eintrag.notizen, style: _small),
+        ],
+      ],
+    ),
+  );
+
+  final contentBlock = pw.Container(
+    decoration: pw.BoxDecoration(
+      border: pw.Border.all(width: 0.75, color: PdfColors.black),
+    ),
+    child: pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Expanded(
+          flex: 5,
+          child: pw.Container(
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(
+                right: pw.BorderSide(width: 0.75, color: PdfColors.black),
+              ),
+            ),
+            child: leftColumn,
+          ),
+        ),
+        pw.Expanded(flex: 1, child: rightColumn),
+      ],
+    ),
+  );
+
+  // ── 3. Signature row ──────────────────────────────────────────────────────
   final signatureRow = pw.Row(
     mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
     children: [
@@ -186,9 +270,9 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
       return pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          headerTable,
+          headerBlock,
           pw.SizedBox(height: 15),
-          contentTable,
+          contentBlock,
           pw.SizedBox(height: 100),
           signatureRow,
         ],
