@@ -2,7 +2,13 @@
   command = "bash build.sh"
   publish = "build/web"
 
+[[headers]]
+  for = "*.wasm"
+  [headers.values]
+    Content-Type = "application/wasm"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  force = false
