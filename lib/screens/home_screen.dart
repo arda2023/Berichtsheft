@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/eintraege_provider.dart';
 import '../widgets/stichpunkt_liste.dart';
 import '../widgets/zusatz_bereich.dart';
+import '../widgets/notizen_feld.dart';
 import '../services/pdf_service.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -66,6 +67,13 @@ class HomeScreen extends ConsumerWidget {
           orElse: () => const Text('Berichtsheft'),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Vorherige Woche',
+            onPressed: () {
+              ref.read(eintraegeProvider.notifier).previousWeek();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.arrow_forward),
             tooltip: 'Nächste Woche',
@@ -135,6 +143,13 @@ class HomeScreen extends ConsumerWidget {
                         krankheitstage: krankheitstage,
                         urlaubstage: urlaubstage,
                       );
+                },
+              ),
+              const SizedBox(height: 24),
+              NotizenFeld(
+                value: eintrag.notizen,
+                onChanged: (value) {
+                  ref.read(eintraegeProvider.notifier).updateNotizen(value);
                 },
               ),
               const SizedBox(height: 24),

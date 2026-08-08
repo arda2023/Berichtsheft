@@ -137,38 +137,95 @@ class EintraegeNotifier extends AsyncNotifier<Eintrag> {
     }
   }
 
+  Future<void> updateNotizen(String value) async {
+    final currentEintrag = state.value;
+    if (currentEintrag == null || currentEintrag.id == null) return;
+
+    final updatedEintrag = currentEintrag.copyWith(
+      notizen: value,
+      updatedAt: DateTime.now(),
+    );
+
+    state = AsyncData(updatedEintrag);
+
+    try {
+      await Supabase.instance.client
+          .from('eintraege')
+          .update({
+            'notizen': value,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', currentEintrag.id!);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
+
+  /// Loads an existing entry for the given [vonDatum] week, or creates a new one
+  /// if none exists. Prevents duplicate rows when navigating weeks.
+  Future<Eintrag> _loadOrCreateWeek(DateTime vonDatum) async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) throw Exception('User is not logged in');
+
+    final bisDatum = vonDatum.add(const Duration(days: 6));
+    final dateStr = vonDatum.toIso8601String().split('T')[0];
+
+    final existing = await client
+        .from('eintraege')
+        .select()
+        .eq('user_id', user.id)
+        .eq('von_datum', dateStr)
+        .maybeSingle();
+
+    if (existing != null) {
+      return Eintrag.fromJson(existing);
+    }
+
+    final newEintrag = Eintrag(
+      userId: user.id,
+      ausbildungsjahr: vonDatum.year,
+      vonDatum: vonDatum,
+      bisDatum: bisDatum,
+      betriebliches: const [],
+      schulisches: const [],
+      pauseMinuten: 30,
+      krankheitstage: 0,
+      urlaubstage: 0,
+    );
+
+    final insertResponse = await client
+        .from('eintraege')
+        .insert(newEintrag.toJson())
+        .select()
+        .single();
+
+    return Eintrag.fromJson(insertResponse);
+  }
+
   Future<void> nextWeek() async {
     final currentEintrag = state.value;
     if (currentEintrag == null) return;
 
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
-
     final newVonDatum = currentEintrag.bisDatum.add(const Duration(days: 1));
-    final newBisDatum = newVonDatum.add(const Duration(days: 6));
-
-    final newEintrag = Eintrag(
-      userId: user.id,
-      ausbildungsjahr: currentEintrag.ausbildungsjahr, 
-      vonDatum: newVonDatum,
-      bisDatum: newBisDatum,
-      betriebliches: const [],
-      schulisches: const [],
-      pauseMinuten: 30, 
-      krankheitstage: 0,
-      urlaubstage: 0,
-    );
-    
     state = const AsyncLoading();
 
     try {
-      final insertResponse = await Supabase.instance.client
-          .from('eintraege')
-          .insert(newEintrag.toJson())
-          .select()
-          .single();
+      state = AsyncData(await _loadOrCreateWeek(newVonDatum));
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
 
-      state = AsyncData(Eintrag.fromJson(insertResponse));
+  Future<void> previousWeek() async {
+    final currentEintrag = state.value;
+    if (currentEintrag == null) return;
+
+    final newVonDatum = currentEintrag.vonDatum.subtract(const Duration(days: 7));
+    state = const AsyncLoading();
+
+    try {
+      state = AsyncData(await _loadOrCreateWeek(newVonDatum));
     } catch (e, st) {
       state = AsyncError(e, st);
     }
@@ -187,12 +244,13 @@ Future<List<Eintrag>> fetchEintraegeInRange(DateTime von, DateTime bis) async {
     return [];
   }
 
+  // Overlap query: entry overlaps [von, bis] if von_datum <= bis AND bis_datum >= von
   final response = await client
       .from('eintraege')
       .select()
       .eq('user_id', user.id)
-      .gte('von_datum', von.toIso8601String())
-      .lte('bis_datum', bis.toIso8601String())
+      .lte('von_datum', bis.toIso8601String())
+      .gte('bis_datum', von.toIso8601String())
       .order('von_datum', ascending: true);
 
   return (response as List)

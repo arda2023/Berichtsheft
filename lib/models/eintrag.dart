@@ -9,6 +9,7 @@ class Eintrag {
   final int pauseMinuten;
   final int krankheitstage;
   final int urlaubstage;
+  final String notizen;
   final DateTime? updatedAt;
 
   const Eintrag({
@@ -22,6 +23,7 @@ class Eintrag {
     this.pauseMinuten = 30,
     this.krankheitstage = 0,
     this.urlaubstage = 0,
+    this.notizen = '',
     this.updatedAt,
   });
 
@@ -36,6 +38,7 @@ class Eintrag {
     int? pauseMinuten,
     int? krankheitstage,
     int? urlaubstage,
+    String? notizen,
     DateTime? updatedAt,
   }) {
     return Eintrag(
@@ -49,6 +52,7 @@ class Eintrag {
       pauseMinuten: pauseMinuten ?? this.pauseMinuten,
       krankheitstage: krankheitstage ?? this.krankheitstage,
       urlaubstage: urlaubstage ?? this.urlaubstage,
+      notizen: notizen ?? this.notizen,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
@@ -65,6 +69,7 @@ class Eintrag {
       pauseMinuten: json['pause_minuten'] as int? ?? 30,
       krankheitstage: json['krankheitstage'] as int? ?? 0,
       urlaubstage: json['urlaubstage'] as int? ?? 0,
+      notizen: json['notizen'] as String? ?? '',
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
           : null,
@@ -83,6 +88,7 @@ class Eintrag {
       'pause_minuten': pauseMinuten,
       'krankheitstage': krankheitstage,
       'urlaubstage': urlaubstage,
+      'notizen': notizen,
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     };
   }
