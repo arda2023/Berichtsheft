@@ -13,9 +13,9 @@ const _margin = 36.0;
 // ── Shared styles & constants ─────────────────────────────────────────────────
 
 const _cellPadding = pw.EdgeInsets.all(4);
-final _bold = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
-final _normal = pw.TextStyle(fontSize: 9);
-final _small = pw.TextStyle(fontSize: 8);
+const _bold = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
+const _normal = pw.TextStyle(fontSize: 9);
+const _small = pw.TextStyle(fontSize: 8);
 
 // ── Shared helper widgets ─────────────────────────────────────────────────────
 
@@ -48,8 +48,8 @@ pw.Widget _signatureBlock(String role) {
         ),
       ),
       pw.SizedBox(height: 4),
-      pw.Text('Datum, Unterschrift', style: pw.TextStyle(fontSize: 8)),
-      pw.Text(role, style: pw.TextStyle(fontSize: 8)),
+      pw.Text('Datum, Unterschrift', style: const pw.TextStyle(fontSize: 8)),
+      pw.Text(role, style: const pw.TextStyle(fontSize: 8)),
     ],
   );
 }
@@ -225,7 +225,7 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
           pw.SizedBox(height: 8),
           pw.Text(
             'Notizen:',
-            style: pw.TextStyle(
+            style: const pw.TextStyle(
               fontSize: 8,
               fontWeight: pw.FontWeight.bold,
             ),
@@ -272,7 +272,7 @@ pw.Page _buildEintragPage(Eintrag eintrag) {
 
   return pw.Page(
     pageFormat: const PdfPageFormat(_pageWidth, _pageHeight),
-    margin: pw.EdgeInsets.all(_margin),
+    margin: const pw.EdgeInsets.all(_margin),
     build: (pw.Context context) {
       return pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -374,7 +374,7 @@ pw.Page _buildDeckblattPage({int? ausbildungsjahr}) {
 
   return pw.Page(
     pageFormat: const PdfPageFormat(_pageWidth, _pageHeight),
-    margin: pw.EdgeInsets.all(_margin),
+    margin: const pw.EdgeInsets.all(_margin),
     build: (pw.Context context) {
       return pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -382,7 +382,7 @@ pw.Page _buildDeckblattPage({int? ausbildungsjahr}) {
           pw.Center(
             child: pw.Text(
               'Ausbildungsnachweis',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+              style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
             ),
           ),
           pw.SizedBox(height: 20),
@@ -429,11 +429,11 @@ Future<Uint8List> generateEintraegeRangePdf(
     doc.addPage(
       pw.Page(
         pageFormat: const PdfPageFormat(_pageWidth, _pageHeight),
-        margin: pw.EdgeInsets.all(_margin),
+        margin: const pw.EdgeInsets.all(_margin),
         build: (pw.Context context) => pw.Center(
           child: pw.Text(
             'Keine Einträge im gewählten Zeitraum',
-            style: pw.TextStyle(fontSize: 12),
+            style: const pw.TextStyle(fontSize: 12),
           ),
         ),
       ),
