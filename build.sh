@@ -17,6 +17,6 @@ flutter doctor
 flutter pub get
 
 # Build Flutter Web application
-flutter build web --release \
+flutter build web --release --web-renderer html \
   --dart-define=SUPABASE_URL=$SUPABASE_URL \
   --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
