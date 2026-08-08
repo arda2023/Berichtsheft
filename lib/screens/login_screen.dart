@@ -38,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
     // Only keep the last character if somehow multiple are pasted/typed
     if (value.length > 1) {
       _controllers[index].text = value[value.length - 1];
-      _controllers[index].selection = TextSelection.collapsed(offset: 1);
+      _controllers[index].selection = const TextSelection.collapsed(offset: 1);
     }
 
     if (value.isNotEmpty && index < _pinLength - 1) {
@@ -62,11 +62,13 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _clearPin() {
+  void _clearPin({bool keepError = false}) {
     for (final c in _controllers) {
       c.clear();
     }
-    setState(() => _errorMessage = null);
+    if (!keepError) {
+      setState(() => _errorMessage = null);
+    }
     _focusNodes[0].requestFocus();
   }
 
@@ -83,18 +85,23 @@ class _LoginScreenState extends State<LoginScreen> {
       // Call the security-definer RPC that resolves PIN → credentials
       // without exposing the user_pins table to the anon role directly.
       final result = await Supabase.instance.client
-          .rpc('get_credentials_for_pin', params: {'pin_code': pin})
-          .select()
-          .maybeSingle();
+          .rpc('get_credentials_for_pin', params: {'pin_code': pin});
 
-      if (result == null) {
+      if (result == null || (result is List && result.isEmpty)) {
         setState(() => _errorMessage = 'Ungültige PIN. Bitte erneut versuchen.');
-        _clearPin();
+        _clearPin(keepError: true);
         return;
       }
 
-      final email = result['email'] as String;
-      final password = result['service_password'] as String;
+      final data = result is List ? result.first : result;
+      final email = data['email'] as String?;
+      final password = data['service_password'] as String?;
+
+      if (email == null || password == null) {
+        setState(() => _errorMessage = 'Ungültige Anmeldedaten vom Server.');
+        _clearPin(keepError: true);
+        return;
+      }
 
       await Supabase.instance.client.auth.signInWithPassword(
         email: email,
@@ -104,12 +111,13 @@ class _LoginScreenState extends State<LoginScreen> {
     } on AuthException catch (e) {
       if (mounted) {
         setState(() => _errorMessage = e.message);
-        _clearPin();
+        _clearPin(keepError: true);
       }
     } catch (e) {
+      debugPrint('Login Error: $e');
       if (mounted) {
         setState(() => _errorMessage = 'Ein Fehler ist aufgetreten.');
-        _clearPin();
+        _clearPin(keepError: true);
       }
     } finally {
       if (mounted) {
@@ -245,7 +253,7 @@ class _PinBox extends StatelessWidget {
               borderSide: BorderSide(color: colorScheme.error, width: 2),
             ),
             filled: true,
-            fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
           ),
           onChanged: onChanged,
         ),
