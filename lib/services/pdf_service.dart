@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../models/eintrag.dart';
 import '../models/profil.dart';
+import '../utils/lehrjahr.dart';
 
 const _pageWidth = 595.28;
 const _pageHeight = 841.89;
@@ -60,6 +61,9 @@ pw.Widget _signatureBlock(String role) {
 pw.Page _buildEintragPage(Eintrag eintrag, Profil profil) {
   final dateFormat = DateFormat('dd.MM.yyyy');
 
+  // Compute Lehrjahr dynamically based on training start date
+  final lehrjahr = berechneLehrjahr(eintrag.vonDatum, profil.ausbildungsbeginn);
+
   // ── Grid cell helper ──────────────────────────────────────────────────────
   pw.Widget gridCell(
     pw.Widget child, {
@@ -103,16 +107,16 @@ pw.Page _buildEintragPage(Eintrag eintrag, Profil profil) {
             ),
           ),
         ]),
-        // Row 2: Ausbildungsjahr + Ausbildungsbereich
+        // Row 2: Lehrjahr + Ausbildungsbereich
         pw.Row(children: [
           pw.Expanded(
             flex: 25,
-            child: gridCell(pw.Text('Ausbildungsjahr:', style: _bold)),
+            child: gridCell(pw.Text('Lehrjahr:', style: _bold)),
           ),
           pw.Expanded(
             flex: 12,
             child: gridCell(
-              pw.Text(eintrag.ausbildungsjahr.toString(), style: _normal),
+              pw.Text(lehrjahr?.toString() ?? '', style: _normal),
             ),
           ),
           pw.Expanded(
@@ -291,7 +295,7 @@ pw.Page _buildEintragPage(Eintrag eintrag, Profil profil) {
 
 // ── Cover page builder ────────────────────────────────────────────────────────
 
-pw.Page _buildDeckblattPage({int? ausbildungsjahr, required Profil profil}) {
+pw.Page _buildDeckblattPage({int? lehrjahr, required Profil profil}) {
   // ── Grid cell helper (same pattern as _buildEintragPage) ─────────────────
   pw.Widget gridCell(
     pw.Widget child, {
@@ -321,7 +325,7 @@ pw.Page _buildDeckblattPage({int? ausbildungsjahr, required Profil profil}) {
       '${profil.betriebAdresse}';
 
   final rows = [
-    ('Ausbildungsjahr:', ausbildungsjahr?.toString() ?? ''),
+    ('Lehrjahr:', lehrjahr?.toString() ?? ''),
     ('Name, Vorname:', profil.name),
     ('Adresse:', profil.adresse),
     ('Ausbildungsberuf:', profil.ausbildungsberuf),
@@ -430,8 +434,16 @@ Future<Uint8List> generateEintragPdf(Eintrag eintrag, Profil profil) async {
 }
 
 /// Generates a multi-page PDF with one page per entry in [eintraege].
+///
 /// If [eintraege] is empty, returns a single-page PDF with a placeholder message.
-/// If [includeDeckblatt] is true and [eintraege] is non-empty, prepends a cover page.
+///
+/// If [includeDeckblatt] is true and [eintraege] is non-empty, entries are grouped
+/// by their computed Lehrjahr number (via [berechneLehrjahr]). Groups are ordered
+/// descending (highest/most-recent Lehrjahr first). For each group a dedicated
+/// cover page is prepended, followed by that group's entries in ascending date order.
+/// Entries with an undetermined Lehrjahr (null) are placed last without a cover page.
+///
+/// If [includeDeckblatt] is false, all entry pages are added in ascending date order.
 Future<Uint8List> generateEintraegeRangePdf(
   List<Eintrag> eintraege,
   Profil profil, {
@@ -452,20 +464,47 @@ Future<Uint8List> generateEintraegeRangePdf(
         ),
       ),
     );
-  } else {
-    if (includeDeckblatt) {
-      doc.addPage(
-        _buildDeckblattPage(
-          ausbildungsjahr: eintraege.first.ausbildungsjahr,
-          profil: profil,
-        ),
-      );
-    }
-    for (final eintrag in eintraege) {
+  } else if (!includeDeckblatt) {
+    // No cover pages — just emit all entry pages in ascending date order.
+    final sorted = List<Eintrag>.from(eintraege)
+      ..sort((a, b) => a.vonDatum.compareTo(b.vonDatum));
+    for (final eintrag in sorted) {
       doc.addPage(_buildEintragPage(eintrag, profil));
+    }
+  } else {
+    // Group entries by Lehrjahr number.
+    final Map<int?, List<Eintrag>> groups = {};
+    for (final eintrag in eintraege) {
+      final lj = berechneLehrjahr(eintrag.vonDatum, profil.ausbildungsbeginn);
+      groups.putIfAbsent(lj, () => []).add(eintrag);
+    }
+
+    // Sort each group's entries in ascending date order.
+    for (final list in groups.values) {
+      list.sort((a, b) => a.vonDatum.compareTo(b.vonDatum));
+    }
+
+    // Collect non-null group keys, sorted descending (most recent first).
+    final sortedKeys = groups.keys
+        .whereType<int>()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    // Emit cover page + entries for each identified Lehrjahr group.
+    for (final lj in sortedKeys) {
+      doc.addPage(_buildDeckblattPage(lehrjahr: lj, profil: profil));
+      for (final eintrag in groups[lj]!) {
+        doc.addPage(_buildEintragPage(eintrag, profil));
+      }
+    }
+
+    // Entries with null Lehrjahr (ausbildungsbeginn not set) go last, no cover.
+    if (groups.containsKey(null)) {
+      for (final eintrag in groups[null]!) {
+        doc.addPage(_buildEintragPage(eintrag, profil));
+      }
     }
   }
 
   return doc.save();
 }
-
