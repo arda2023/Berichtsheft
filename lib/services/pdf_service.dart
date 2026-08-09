@@ -15,7 +15,7 @@ const _margin = 36.0;
 // ── Shared styles & constants ─────────────────────────────────────────────────
 
 const _cellPadding = pw.EdgeInsets.all(4);
-const _bold = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
+final _bold = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
 const _normal = pw.TextStyle(fontSize: 9);
 const _small = pw.TextStyle(fontSize: 8);
 
@@ -230,7 +230,7 @@ pw.Page _buildEintragPage(Eintrag eintrag, Profil profil) {
           pw.SizedBox(height: 8),
           pw.Text(
             'Notizen:',
-            style: const pw.TextStyle(
+            style: pw.TextStyle(
               fontSize: 8,
               fontWeight: pw.FontWeight.bold,
             ),
@@ -399,7 +399,7 @@ pw.Page _buildDeckblattPage({int? lehrjahr, required Profil profil}) {
           pw.Center(
             child: pw.Text(
               'Ausbildungsnachweis',
-              style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
             ),
           ),
           pw.SizedBox(height: 20),
@@ -485,9 +485,7 @@ Future<Uint8List> generateEintraegeRangePdf(
     }
 
     // Collect non-null group keys, sorted descending (most recent first).
-    final sortedKeys = groups.keys
-        .whereType<int>()
-        .toList()
+    final sortedKeys = groups.keys.whereType<int>().toList()
       ..sort((a, b) => b.compareTo(a));
 
     // Emit cover page + entries for each identified Lehrjahr group.
