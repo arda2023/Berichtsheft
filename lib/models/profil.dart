@@ -7,6 +7,12 @@ class Profil {
   final String betriebAdresse;
   final String ausbilder;
   final String ausbildungsbereich;
+  final String wochenstunden;
+  final String pause;
+  final String arbeitszeiten;
+  final String schultage;
+  final String schulNotizen;
+  final List<String> faecher;
   final DateTime? ausbildungsbeginn;
   final DateTime? ausbildungsende;
   final DateTime? updatedAt;
@@ -20,6 +26,12 @@ class Profil {
     this.betriebAdresse = '',
     this.ausbilder = '',
     this.ausbildungsbereich = '',
+    this.wochenstunden = '40 Std./Woche',
+    this.pause = '30 min. pro Tag',
+    this.arbeitszeiten = '8:00 - 16:30 Uhr',
+    this.schultage = 'Montag und Donnerstag: 8:00 - 13:00 Uhr',
+    this.schulNotizen = '',
+    this.faecher = const [],
     this.ausbildungsbeginn,
     this.ausbildungsende,
     this.updatedAt,
@@ -34,6 +46,12 @@ class Profil {
     String? betriebAdresse,
     String? ausbilder,
     String? ausbildungsbereich,
+    String? wochenstunden,
+    String? pause,
+    String? arbeitszeiten,
+    String? schultage,
+    String? schulNotizen,
+    List<String>? faecher,
     DateTime? ausbildungsbeginn,
     DateTime? ausbildungsende,
     DateTime? updatedAt,
@@ -47,6 +65,12 @@ class Profil {
       betriebAdresse: betriebAdresse ?? this.betriebAdresse,
       ausbilder: ausbilder ?? this.ausbilder,
       ausbildungsbereich: ausbildungsbereich ?? this.ausbildungsbereich,
+      wochenstunden: wochenstunden ?? this.wochenstunden,
+      pause: pause ?? this.pause,
+      arbeitszeiten: arbeitszeiten ?? this.arbeitszeiten,
+      schultage: schultage ?? this.schultage,
+      schulNotizen: schulNotizen ?? this.schulNotizen,
+      faecher: faecher ?? this.faecher,
       ausbildungsbeginn: ausbildungsbeginn ?? this.ausbildungsbeginn,
       ausbildungsende: ausbildungsende ?? this.ausbildungsende,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -63,6 +87,12 @@ class Profil {
       betriebAdresse: json['betrieb_adresse'] as String? ?? '',
       ausbilder: json['ausbilder'] as String? ?? '',
       ausbildungsbereich: json['ausbildungsbereich'] as String? ?? '',
+      wochenstunden: json['wochenstunden'] as String? ?? '40 Std./Woche',
+      pause: json['pause'] as String? ?? '30 min. pro Tag',
+      arbeitszeiten: json['arbeitszeiten'] as String? ?? '8:00 - 16:30 Uhr',
+      schultage: json['schultage'] as String? ?? 'Montag und Donnerstag: 8:00 - 13:00 Uhr',
+      schulNotizen: json['schul_notizen'] as String? ?? '',
+      faecher: List<String>.from(json['faecher'] ?? []),
       ausbildungsbeginn: json['ausbildungsbeginn'] != null
           ? DateTime.parse(json['ausbildungsbeginn'] as String)
           : null,
@@ -85,6 +115,12 @@ class Profil {
       'betrieb_adresse': betriebAdresse,
       'ausbilder': ausbilder,
       'ausbildungsbereich': ausbildungsbereich,
+      'wochenstunden': wochenstunden,
+      'pause': pause,
+      'arbeitszeiten': arbeitszeiten,
+      'schultage': schultage,
+      'schul_notizen': schulNotizen,
+      'faecher': faecher,
       'ausbildungsbeginn': ausbildungsbeginn?.toIso8601String(),
       'ausbildungsende': ausbildungsende?.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),

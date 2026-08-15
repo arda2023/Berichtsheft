@@ -16,9 +16,9 @@ const _margin = 36.0;
 // ── Shared styles & constants ─────────────────────────────────────────────────
 
 const _cellPadding = pw.EdgeInsets.all(4);
-final _bold = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
-final _normal = pw.TextStyle(fontSize: 9);
-final _small = pw.TextStyle(fontSize: 8);
+final _bold = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12);
+final _normal = pw.TextStyle(fontSize: 12);
+final _small = pw.TextStyle(fontSize: 9);
 
 // German month names, 1-indexed (index 0 unused).
 const _monthNames = [
@@ -52,6 +52,29 @@ pw.Widget _itemList(List<String> items, {double fontSize = 9}) {
         )
         .toList(),
   );
+}
+
+/// Estimates the largest font size (step 0.5, max→min) such that all
+/// [items] rendered as '- item' lines fit within [availableHeight] at 1.35
+/// line-height. Returns at least [minFont].
+double _fitFontSize(
+  List<String> items, {
+  double availableHeight = 112,
+  double maxFont = 12,
+  double minFont = 6,
+  double charsPerLine = 45,
+}) {
+  if (items.isEmpty) return maxFont;
+  final totalLines = items.fold<int>(
+    0,
+    (sum, item) => sum + (item.length / charsPerLine).ceil().clamp(1, 999),
+  );
+  double f = maxFont;
+  while (f > minFont) {
+    if (totalLines * f * 1.35 <= availableHeight) return f;
+    f -= 0.5;
+  }
+  return minFont;
 }
 
 /// A thin full-border box (0.75pt black).
@@ -205,7 +228,9 @@ List<pw.Page> _buildMonthPages(
 
   // ── 4. Main table (LEFT 72% | RIGHT 28%), fixed height 600pt ───────────────
   const mainTableHeight = 600.0;
-  const kwLabelWidth = 55.0;
+  const kwLabelWidth = 70.0;
+  // Usable height per KW row for dynamic font sizing (600/5 minus ~8pt padding).
+  const kwRowContentHeight = mainTableHeight / 5 - 8;
 
   // Build 5 KW rows for the LEFT panel.
   final List<pw.Widget> kwRowWidgets = [];
@@ -223,11 +248,11 @@ List<pw.Page> _buildMonthPages(
         children: [
           pw.Text(
             'KW : ${slot.kwNummer}',
-            style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
           ),
           pw.Text(
             '${dd(slot.montag)}-${ddyyyy(slot.sonntag)}',
-            style: pw.TextStyle(fontSize: 6),
+            style: pw.TextStyle(fontSize: 12),
           ),
         ],
       );
@@ -248,12 +273,20 @@ List<pw.Page> _buildMonthPages(
       );
     }
 
-    // Content cell (betriebliche Tätigkeiten).
+    // Content cell (betriebliche Tätigkeiten) — dynamic font to fit rows.
     final contentCell = pw.Expanded(
       child: pw.Container(
         padding: _cellPadding,
         alignment: pw.Alignment.topLeft,
-        child: entry != null ? _itemList(entry.betriebliches) : pw.SizedBox(),
+        child: entry != null
+            ? _itemList(
+                entry.betriebliches,
+                fontSize: _fitFontSize(
+                  entry.betriebliches,
+                  availableHeight: kwRowContentHeight,
+                ),
+              )
+            : pw.SizedBox(),
       ),
     );
 
@@ -285,35 +318,30 @@ List<pw.Page> _buildMonthPages(
   );
 
   // RIGHT panel — Wochenstunden, Pause, Arbeitszeiten, Besonderheiten.
-  // NOTE: Profil does not have wochenstunden/pause/arbeitszeiten fields.
-  // We render the available data: pauseMinuten from entries and
-  // Krankheit/Urlaub Besonderheiten from entries.
+  final rightStyle = pw.TextStyle(fontSize: 12);
+  final rightBoldStyle = pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold);
+
   final List<pw.Widget> rightItems = [
-    pw.Text('Besonderheiten:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-    pw.SizedBox(height: 6),
+    pw.Text('Wochenstunden:', style: rightBoldStyle),
+    pw.Text(profil.wochenstunden, style: rightStyle),
+    pw.SizedBox(height: 8),
+    pw.Text('Pause:', style: rightBoldStyle),
+    pw.Text(profil.pause, style: rightStyle),
+    pw.SizedBox(height: 8),
+    pw.Text('Arbeitszeiten:', style: rightBoldStyle),
+    pw.Text(profil.arbeitszeiten, style: rightStyle),
+    pw.SizedBox(height: 8),
+    pw.Text('Besonderheiten:', style: rightBoldStyle),
   ];
 
-  bool anyBesonderheit = false;
   for (final e in sorted) {
-    if (e.krankheitstage > 0) {
+    final b = e.besonderheiten.trim();
+    if (b.isNotEmpty) {
       rightItems.add(pw.Text(
-        'Krankheit: ${e.krankheitstage} Tg (KW ${isoWeekNumber(e.vonDatum)})',
-        style: pw.TextStyle(fontSize: 10),
+        '$b (KW ${isoWeekNumber(e.vonDatum)})',
+        style: rightStyle,
       ));
-      rightItems.add(pw.SizedBox(height: 2));
-      anyBesonderheit = true;
     }
-    if (e.urlaubstage > 0) {
-      rightItems.add(pw.Text(
-        'Urlaub: ${e.urlaubstage} Tg (KW ${isoWeekNumber(e.vonDatum)})',
-        style: pw.TextStyle(fontSize: 10),
-      ));
-      rightItems.add(pw.SizedBox(height: 2));
-      anyBesonderheit = true;
-    }
-  }
-  if (!anyBesonderheit) {
-    rightItems.add(pw.Text('—', style: pw.TextStyle(fontSize: 10)));
   }
 
   final rightPanel = pw.Expanded(
@@ -322,6 +350,7 @@ List<pw.Page> _buildMonthPages(
       padding: _cellPadding,
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
+        mainAxisAlignment: pw.MainAxisAlignment.start,
         children: rightItems,
       ),
     ),
@@ -371,10 +400,21 @@ List<pw.Page> _buildMonthPages(
   // ── 2. Schulische content table (LEFT 68% | RIGHT 32%), 380pt ─────────────
   const schulTableHeight = 380.0;
 
-  // Merge all schulisches items from all month entries.
-  final List<String> allSchulisches = [];
-  for (final e in sorted) {
-    allSchulisches.addAll(e.schulisches);
+  // LEFT panel: per-fach schulischesProFach items, merged chronologically.
+  final schulLeftChildren = <pw.Widget>[];
+  for (final fach in profil.faecher) {
+    final items = <String>[];
+    for (final e in sorted) {
+      items.addAll(e.schulischesProFach[fach] ?? []);
+    }
+    schulLeftChildren.add(
+      pw.Text('$fach:', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+    );
+    if (items.isNotEmpty) {
+      schulLeftChildren.add(pw.SizedBox(height: 2));
+      schulLeftChildren.add(_itemList(items, fontSize: 12));
+    }
+    schulLeftChildren.add(pw.SizedBox(height: 6));
   }
 
   final schulLeftPanel = pw.Expanded(
@@ -384,14 +424,19 @@ List<pw.Page> _buildMonthPages(
       padding: _cellPadding,
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text('Schulische Tätigkeiten:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-          pw.SizedBox(height: 6),
-          _itemList(allSchulisches, fontSize: 10),
-        ],
+        children: schulLeftChildren,
       ),
     ),
   );
+
+  // RIGHT panel: schultage as-is, then optional schulNotizen.
+  final schulRightChildren = <pw.Widget>[
+    pw.Text(profil.schultage, style: pw.TextStyle(fontSize: 12)),
+  ];
+  if (profil.schulNotizen.trim().isNotEmpty) {
+    schulRightChildren.add(pw.SizedBox(height: 8));
+    schulRightChildren.add(pw.Text(profil.schulNotizen.trim(), style: pw.TextStyle(fontSize: 12)));
+  }
 
   final schulRightPanel = pw.Expanded(
     flex: 32,
@@ -399,12 +444,7 @@ List<pw.Page> _buildMonthPages(
       padding: _cellPadding,
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            profil.fachrichtung.isNotEmpty ? profil.fachrichtung : '—',
-            style: pw.TextStyle(fontSize: 10),
-          ),
-        ],
+        children: schulRightChildren,
       ),
     ),
   );
@@ -663,13 +703,18 @@ pw.Page _buildDeckblattPage({int? lehrjahr, required Profil profil}) {
 
 /// Generates a two-page PDF for the month of [eintrag.vonDatum].
 ///
-/// Only [eintrag] is used as month data, so only its KW row will be filled.
-Future<Uint8List> generateEintragPdf(Eintrag eintrag, Profil profil) async {
+/// [sameMonthEntries] should contain ALL entries for that calendar month
+/// (including [eintrag] itself), so every KW row that has data is filled.
+Future<Uint8List> generateEintragPdf(
+  Eintrag eintrag,
+  List<Eintrag> sameMonthEntries,
+  Profil profil,
+) async {
   final doc = pw.Document();
   final pages = _buildMonthPages(
     eintrag.vonDatum.year,
     eintrag.vonDatum.month,
-    [eintrag],
+    sameMonthEntries,
     profil,
   );
   for (final page in pages) {

@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 class NotizenFeld extends StatefulWidget {
   final String value;
   final ValueChanged<String> onChanged;
+  final String label;
 
   const NotizenFeld({
     super.key,
     required this.value,
     required this.onChanged,
+    this.label = 'Notizen',
   });
 
   @override
@@ -61,7 +63,7 @@ class _NotizenFeldState extends State<NotizenFeld> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Notizen',
+          widget.label,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),

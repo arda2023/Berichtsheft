@@ -161,6 +161,54 @@ class EintraegeNotifier extends AsyncNotifier<Eintrag> {
     }
   }
 
+  Future<void> updateBesonderheiten(String value) async {
+    final currentEintrag = state.value;
+    if (currentEintrag == null || currentEintrag.id == null) return;
+
+    final updatedEintrag = currentEintrag.copyWith(
+      besonderheiten: value,
+      updatedAt: DateTime.now(),
+    );
+
+    state = AsyncData(updatedEintrag);
+
+    try {
+      await Supabase.instance.client
+          .from('eintraege')
+          .update({
+            'besonderheiten': value,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', currentEintrag.id!);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
+
+  Future<void> updateSchulischesProFach(Map<String, List<String>> value) async {
+    final currentEintrag = state.value;
+    if (currentEintrag == null || currentEintrag.id == null) return;
+
+    final updatedEintrag = currentEintrag.copyWith(
+      schulischesProFach: value,
+      updatedAt: DateTime.now(),
+    );
+
+    state = AsyncData(updatedEintrag);
+
+    try {
+      await Supabase.instance.client
+          .from('eintraege')
+          .update({
+            'schulisches_pro_fach': value,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', currentEintrag.id!);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
+
   /// Loads an existing entry for the given [vonDatum] week, or creates a new one
   /// if none exists. Prevents duplicate rows when navigating weeks.
   Future<Eintrag> _loadOrCreateWeek(DateTime vonDatum) async {

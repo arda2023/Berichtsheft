@@ -138,14 +138,33 @@ class HomeScreen extends ConsumerWidget {
                 },
               ),
               const SizedBox(height: 24),
-              StichpunktListe(
-                label: 'Schulische Tätigkeiten',
-                items: eintrag.schulisches,
-                onChanged: (items) {
-                  ref.read(eintraegeProvider.notifier).updateSchulisches(items);
-                },
-              ),
-              const SizedBox(height: 24),
+              ...() {
+                final faecher = ref.watch(profilProvider).value?.faecher ?? [];
+                if (faecher.isEmpty) {
+                  return [
+                    const Text(
+                      'Keine Fächer im Profil hinterlegt (unter Profil hinzufügen)',
+                      style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                  ];
+                }
+                
+                return faecher.map((fach) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 24.0),
+                    child: StichpunktListe(
+                      label: fach,
+                      items: eintrag.schulischesProFach[fach] ?? const [],
+                      onChanged: (items) {
+                        final map = Map<String, List<String>>.from(eintrag.schulischesProFach);
+                        map[fach] = items;
+                        ref.read(eintraegeProvider.notifier).updateSchulischesProFach(map);
+                      },
+                    ),
+                  );
+                }).toList();
+              }(),
               ZusatzBereich(
                 pauseMinuten: eintrag.pauseMinuten,
                 krankheitstage: eintrag.krankheitstage,
@@ -160,6 +179,15 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
               NotizenFeld(
+                label: 'Besonderheiten',
+                value: eintrag.besonderheiten,
+                onChanged: (value) {
+                  ref.read(eintraegeProvider.notifier).updateBesonderheiten(value);
+                },
+              ),
+              const SizedBox(height: 24),
+              NotizenFeld(
+                label: 'Notizen',
                 value: eintrag.notizen,
                 onChanged: (value) {
                   ref.read(eintraegeProvider.notifier).updateNotizen(value);
@@ -196,7 +224,10 @@ class HomeScreen extends ConsumerWidget {
                       );
 
                       try {
-                        final pdfBytes = await generateEintragPdf(eintrag, profil);
+                        final monthStart = DateTime(eintrag.vonDatum.year, eintrag.vonDatum.month, 1);
+                        final monthEnd = DateTime(eintrag.vonDatum.year, eintrag.vonDatum.month + 1, 0);
+                        final sameMonth = await fetchEintraegeInRange(monthStart, monthEnd);
+                        final pdfBytes = await generateEintragPdf(eintrag, sameMonth, profil);
                         if (context.mounted) {
                           Navigator.of(context).pop(); // dismiss loading dialog
                         }

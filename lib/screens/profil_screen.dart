@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../models/profil.dart';
 import '../providers/profil_provider.dart';
+import '../widgets/stichpunkt_liste.dart';
 
 class ProfilScreen extends ConsumerStatefulWidget {
   final bool isFirstSetup;
@@ -26,6 +27,10 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
   late final TextEditingController _betriebAdresseController;
   late final TextEditingController _ausbilderController;
   late final TextEditingController _ausbildungsbereichController;
+  late final TextEditingController _schultageController;
+  late final TextEditingController _schulNotizenController;
+
+  List<String> _faecher = [];
 
   DateTime? _ausbildungsbeginn;
   DateTime? _ausbildungsende;
@@ -45,6 +50,8 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
     _betriebAdresseController = TextEditingController();
     _ausbilderController = TextEditingController();
     _ausbildungsbereichController = TextEditingController();
+    _schultageController = TextEditingController();
+    _schulNotizenController = TextEditingController();
   }
 
   @override
@@ -57,6 +64,8 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
     _betriebAdresseController.dispose();
     _ausbilderController.dispose();
     _ausbildungsbereichController.dispose();
+    _schultageController.dispose();
+    _schulNotizenController.dispose();
     super.dispose();
   }
 
@@ -70,6 +79,9 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
     _betriebAdresseController.text = profil.betriebAdresse;
     _ausbilderController.text = profil.ausbilder;
     _ausbildungsbereichController.text = profil.ausbildungsbereich;
+    _schultageController.text = profil.schultage;
+    _schulNotizenController.text = profil.schulNotizen;
+    _faecher = List.from(profil.faecher);
     _ausbildungsbeginn = profil.ausbildungsbeginn;
     _ausbildungsende = profil.ausbildungsende;
     _initialized = true;
@@ -101,6 +113,8 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
   Future<void> _saveProfil() async {
     setState(() => _isSaving = true);
 
+    final currentProfil = ref.read(profilProvider).value;
+
     final updated = Profil(
       name: _nameController.text.trim(),
       adresse: _adresseController.text.trim(),
@@ -110,6 +124,12 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
       betriebAdresse: _betriebAdresseController.text.trim(),
       ausbilder: _ausbilderController.text.trim(),
       ausbildungsbereich: _ausbildungsbereichController.text.trim(),
+      schultage: _schultageController.text.trim(),
+      schulNotizen: _schulNotizenController.text.trim(),
+      faecher: _faecher,
+      wochenstunden: currentProfil?.wochenstunden ?? '40 Std./Woche',
+      pause: currentProfil?.pause ?? '30 min. pro Tag',
+      arbeitszeiten: currentProfil?.arbeitszeiten ?? '8:00 - 16:30 Uhr',
       ausbildungsbeginn: _ausbildungsbeginn,
       ausbildungsende: _ausbildungsende,
     );
@@ -282,6 +302,33 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
                         controller: _ausbildungsbereichController,
                         decoration: const InputDecoration(
                           labelText: 'Ausbildungsbereich',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      StichpunktListe(
+                        label: 'Fächer (Berufsschule)',
+                        items: _faecher,
+                        onChanged: (items) {
+                          setState(() {
+                            _faecher = items;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _schultageController,
+                        decoration: const InputDecoration(
+                          labelText: 'Schultage (Seite 2)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _schulNotizenController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Schulische Notizen (optional)',
                           border: OutlineInputBorder(),
                         ),
                       ),
