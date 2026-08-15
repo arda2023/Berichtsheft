@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/eintraege_provider.dart';
 import '../providers/profil_provider.dart';
 import 'profil_screen.dart';
+import '../widgets/kw_picker.dart';
 import '../widgets/stichpunkt_liste.dart';
 import '../widgets/notizen_feld.dart';
 import '../services/pdf_service.dart';
@@ -336,15 +337,14 @@ class HomeScreen extends ConsumerWidget {
 
                       final maxDate = await fetchLatestBisDatum() ?? DateTime.now();
                       if (!context.mounted) return;
-                      
-                      final range = await showDateRangePicker(
-                        context: context,
-                        firstDate: DateTime(2026, 1, 1),
-                        lastDate: maxDate,
-                        initialDateRange: null,
+
+                      final kwRange = await showKwPicker(
+                        context,
+                        firstMonth: DateTime(2026, 1, 1),
+                        lastMonth: DateTime(maxDate.year, maxDate.month, 1),
                       );
-                      
-                      if (range == null) return;
+
+                      if (kwRange == null) return;
 
                       // Ask whether to include a cover page
                       if (!context.mounted) return;
@@ -396,7 +396,7 @@ class HomeScreen extends ConsumerWidget {
                       }
 
                       try {
-                        final eintraege = await fetchEintraegeInRange(range.start, range.end);
+                        final eintraege = await fetchEintraegeInRange(kwRange.start, kwRange.end);
                         final pdfBytes = await generateEintraegeRangePdf(
                           eintraege,
                           profil,
@@ -406,7 +406,7 @@ class HomeScreen extends ConsumerWidget {
                           Navigator.of(context).pop(); // dismiss loading dialog
                         }
                         final filename =
-                            'berichtsheft_${DateFormat('yyyy-MM-dd').format(range.start)}_bis_${DateFormat('yyyy-MM-dd').format(range.end)}.pdf';
+                            'berichtsheft_${DateFormat('yyyy-MM-dd').format(kwRange.start)}_bis_${DateFormat('yyyy-MM-dd').format(kwRange.end)}.pdf';
                         await Printing.sharePdf(
                           bytes: pdfBytes,
                           filename: filename,
