@@ -27,6 +27,7 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
   late final TextEditingController _betriebAdresseController;
   late final TextEditingController _ausbilderController;
   late final TextEditingController _ausbildungsbereichController;
+  late final TextEditingController _arbeitszeitenController;
   late final TextEditingController _schultageController;
   late final TextEditingController _schulNotizenController;
 
@@ -50,6 +51,7 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
     _betriebAdresseController = TextEditingController();
     _ausbilderController = TextEditingController();
     _ausbildungsbereichController = TextEditingController();
+    _arbeitszeitenController = TextEditingController();
     _schultageController = TextEditingController();
     _schulNotizenController = TextEditingController();
   }
@@ -64,6 +66,7 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
     _betriebAdresseController.dispose();
     _ausbilderController.dispose();
     _ausbildungsbereichController.dispose();
+    _arbeitszeitenController.dispose();
     _schultageController.dispose();
     _schulNotizenController.dispose();
     super.dispose();
@@ -79,6 +82,7 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
     _betriebAdresseController.text = profil.betriebAdresse;
     _ausbilderController.text = profil.ausbilder;
     _ausbildungsbereichController.text = profil.ausbildungsbereich;
+    _arbeitszeitenController.text = profil.arbeitszeiten;
     _schultageController.text = profil.schultage;
     _schulNotizenController.text = profil.schulNotizen;
     _faecher = List.from(profil.faecher);
@@ -129,7 +133,7 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
       faecher: _faecher,
       wochenstunden: currentProfil?.wochenstunden ?? '40 Std./Woche',
       pause: currentProfil?.pause ?? '30 min. pro Tag',
-      arbeitszeiten: currentProfil?.arbeitszeiten ?? '8:00 - 16:30 Uhr',
+      arbeitszeiten: _arbeitszeitenController.text.trim(),
       ausbildungsbeginn: _ausbildungsbeginn,
       ausbildungsende: _ausbildungsende,
     );
@@ -208,20 +212,22 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
           return Column(
             children: [
               if (widget.isFirstSetup && !_hideBanner)
-                Material(
+                Card(
                   color: Theme.of(context).colorScheme.primaryContainer,
+                  margin: const EdgeInsets.all(16.0),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16.0,
-                      vertical: 8.0,
+                      vertical: 12.0,
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info_outline),
+                        Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onPrimaryContainer),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Bitte fülle deine Ausbildungsdaten aus (kann später jederzeit geändert werden).',
+                            style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
                           ),
                         ),
                         IconButton(
@@ -237,124 +243,195 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
                   ),
                 ),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Name, Vorname',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _adresseController,
-                        decoration: const InputDecoration(
-                          labelText: 'Adresse',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _ausbildungsberufController,
-                        decoration: const InputDecoration(
-                          labelText: 'Ausbildungsberuf',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _fachrichtungController,
-                        decoration: const InputDecoration(
-                          labelText: 'Fachrichtung, Schwerpunkt',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _betriebNameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Ausbildungsbetrieb (Name)',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _betriebAdresseController,
-                        decoration: const InputDecoration(
-                          labelText: 'Ausbildungsbetrieb (Adresse)',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _ausbilderController,
-                        decoration: const InputDecoration(
-                          labelText: 'Ausbilder/in',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _ausbildungsbereichController,
-                        decoration: const InputDecoration(
-                          labelText: 'Ausbildungsbereich',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      StichpunktListe(
-                        label: 'Fächer (Berufsschule)',
-                        items: _faecher,
-                        onChanged: (items) {
-                          setState(() {
-                            _faecher = items;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _schultageController,
-                        decoration: const InputDecoration(
-                          labelText: 'Schultage (Seite 2)',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _schulNotizenController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Schulische Notizen (optional)',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      _buildDateField('Ausbildungsbeginn', true),
-                      const SizedBox(height: 8),
-                      _buildDateField('Ausbildungsende', false),
-                      const SizedBox(height: 32),
-                      ElevatedButton(
-                        onPressed: _isSaving ? null : _saveProfil,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: _isSaving
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text(
-                                'Speichern',
-                                style: TextStyle(fontSize: 16),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.person_outline, color: Theme.of(context).colorScheme.primary),
+                                      const SizedBox(width: 8),
+                                      Text('Persönliche Daten', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 24),
+                                  TextFormField(
+                                    controller: _nameController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Name, Vorname',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _adresseController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Adresse',
+                                    ),
+                                  ),
+                                ],
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.school_outlined, color: Theme.of(context).colorScheme.primary),
+                                      const SizedBox(width: 8),
+                                      Text('Ausbildung', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 24),
+                                  TextFormField(
+                                    controller: _ausbildungsberufController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Ausbildungsberuf',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _fachrichtungController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Fachrichtung, Schwerpunkt',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _ausbildungsbereichController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Ausbildungsbereich',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  _buildDateField('Ausbildungsbeginn', true),
+                                  const SizedBox(height: 8),
+                                  _buildDateField('Ausbildungsende', false),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.business_outlined, color: Theme.of(context).colorScheme.primary),
+                                      const SizedBox(width: 8),
+                                      Text('Betrieb', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 24),
+                                  TextFormField(
+                                    controller: _betriebNameController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Ausbildungsbetrieb (Name)',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _betriebAdresseController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Ausbildungsbetrieb (Adresse)',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _ausbilderController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Ausbilder/in',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.menu_book_outlined, color: Theme.of(context).colorScheme.primary),
+                                      const SizedBox(width: 8),
+                                      Text('Berufsschule', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 24),
+                                  TextFormField(
+                                    controller: _arbeitszeitenController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Arbeitszeiten',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  StichpunktListe(
+                                    label: 'Fächer (Berufsschule)',
+                                    items: _faecher,
+                                    onChanged: (items) {
+                                      setState(() {
+                                        _faecher = items;
+                                      });
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _schultageController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Schultage (Seite 2)',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _schulNotizenController,
+                                    maxLines: 3,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Schulische Notizen (optional)',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          FilledButton(
+                            onPressed: _isSaving ? null : _saveProfil,
+                            child: _isSaving
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text(
+                                    'Speichern',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                       ),
-                      const SizedBox(height: 24),
-                    ],
+                    ),
                   ),
                 ),
               ),

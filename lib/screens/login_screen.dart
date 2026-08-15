@@ -66,15 +66,28 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Card(
+              margin: const EdgeInsets.all(16.0),
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
               child: Form(
                 key: _formKey,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const SizedBox(height: 24),
+                    CircleAvatar(
+                      radius: 32,
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      child: Icon(
+                        Icons.book,
+                        size: 32,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     const Text(
                       'Berichtsheft',
                       style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
@@ -90,12 +103,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'E-Mail',
-                        prefixIcon: const Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -108,12 +118,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _passwordController,
                       obscureText: true,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Passwort',
-                        prefixIcon: const Icon(Icons.lock_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        prefixIcon: Icon(Icons.lock_outlined),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -123,20 +130,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                     ),
                     const SizedBox(height: 24),
-                    ElevatedButton(
+                    FilledButton(
                       onPressed: _isLoading ? null : _attemptLogin,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
                       child: _isLoading
                           ? const SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
+                                color: Colors.white,
                               ),
                             )
                           : const Text(
@@ -146,6 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
+              ),
               ),
             ),
           ),

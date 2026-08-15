@@ -8,7 +8,6 @@ import '../providers/eintraege_provider.dart';
 import '../providers/profil_provider.dart';
 import 'profil_screen.dart';
 import '../widgets/stichpunkt_liste.dart';
-import '../widgets/zusatz_bereich.dart';
 import '../widgets/notizen_feld.dart';
 import '../services/pdf_service.dart';
 
@@ -60,9 +59,21 @@ class HomeScreen extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('Berichtsheft'),
-              Text(
-                '${_formatDate(eintrag.vonDatum)} – ${_formatDate(eintrag.bisDatum)}',
-                style: Theme.of(context).textTheme.bodySmall,
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_formatDate(eintrag.vonDatum)} – ${_formatDate(eintrag.bisDatum)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ],
           ),
@@ -125,20 +136,55 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
         ),
-        data: (eintrag) => SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              StichpunktListe(
-                label: 'Betriebliche Tätigkeiten',
-                items: eintrag.betriebliches,
-                onChanged: (items) {
-                  ref.read(eintraegeProvider.notifier).updateBetriebliches(items);
-                },
-              ),
-              const SizedBox(height: 24),
-              ...() {
+        data: (eintrag) => Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.work_outline, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Text('Betriebliche Tätigkeiten', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          StichpunktListe(
+                            label: 'Tätigkeiten',
+                            items: eintrag.betriebliches,
+                            onChanged: (items) {
+                              ref.read(eintraegeProvider.notifier).updateBetriebliches(items);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.school_outlined, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Text('Schulische Tätigkeiten', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          ...() {
                 final faecher = ref.watch(profilProvider).value?.faecher ?? [];
                 if (faecher.isEmpty) {
                   return [
@@ -146,7 +192,6 @@ class HomeScreen extends ConsumerWidget {
                       'Keine Fächer im Profil hinterlegt (unter Profil hinzufügen)',
                       style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
                     ),
-                    const SizedBox(height: 24),
                   ];
                 }
                 
@@ -165,41 +210,65 @@ class HomeScreen extends ConsumerWidget {
                   );
                 }).toList();
               }(),
-              ZusatzBereich(
-                pauseMinuten: eintrag.pauseMinuten,
-                krankheitstage: eintrag.krankheitstage,
-                urlaubstage: eintrag.urlaubstage,
-                onChanged: ({pauseMinuten, krankheitstage, urlaubstage}) {
-                  ref.read(eintraegeProvider.notifier).updateZusatz(
-                        pauseMinuten: pauseMinuten,
-                        krankheitstage: krankheitstage,
-                        urlaubstage: urlaubstage,
-                      );
-                },
-              ),
-              const SizedBox(height: 24),
-              NotizenFeld(
-                label: 'Besonderheiten',
-                value: eintrag.besonderheiten,
-                onChanged: (value) {
-                  ref.read(eintraegeProvider.notifier).updateBesonderheiten(value);
-                },
-              ),
-              const SizedBox(height: 24),
-              NotizenFeld(
-                label: 'Notizen',
-                value: eintrag.notizen,
-                onChanged: (value) {
-                  ref.read(eintraegeProvider.notifier).updateNotizen(value);
-                },
-              ),
-              const SizedBox(height: 24),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                alignment: WrapAlignment.center,
-                children: [
-                  ElevatedButton.icon(
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.edit_note, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Text('Besonderheiten & Notizen', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          NotizenFeld(
+                            label: 'Besonderheiten',
+                            value: eintrag.besonderheiten,
+                            onChanged: (value) {
+                              ref.read(eintraegeProvider.notifier).updateBesonderheiten(value);
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          NotizenFeld(
+                            label: 'Notizen',
+                            value: eintrag.notizen,
+                            onChanged: (value) {
+                              ref.read(eintraegeProvider.notifier).updateNotizen(value);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.print_outlined, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Text('Export & PDF', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 16,
+                            alignment: WrapAlignment.start,
+                            children: [
+                  FilledButton.icon(
                     icon: const Icon(Icons.picture_as_pdf),
                     label: const Text('PDF anzeigen'),
                     onPressed: () async {
@@ -249,7 +318,7 @@ class HomeScreen extends ConsumerWidget {
                       }
                     },
                   ),
-                  ElevatedButton.icon(
+                  OutlinedButton.icon(
                     icon: const Icon(Icons.date_range),
                     label: const Text('Zeitraum exportieren'),
                     onPressed: () async {
@@ -357,6 +426,12 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
             ],
+          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

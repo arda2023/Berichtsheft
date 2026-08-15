@@ -79,3 +79,46 @@ List<KwSlot> kwSlotsForMonth(int year, int month) {
   
   return slots;
 }
+
+/// Returns every Monday-based week (Mon–Sun) that **overlaps** the given
+/// [year]/[month], i.e. the week's Sunday >= firstDay AND the week's Monday
+/// <= lastDay of the month.
+///
+/// This is the overlap-based counterpart to [kwSlotsForMonth]:
+/// - A week starting Mon 28.10 and ending Sun 03.11 appears on **both**
+///   the October and November page.
+/// - Each [KwSlot] stores the true [montag]/[sonntag] (not clipped). The
+///   PDF layer clips them to the month boundary for display purposes.
+///
+/// Example: for November 2024, yields 5 slots:
+/// - KW 44: Mon 28.10 – Sun 03.11  (overlaps from October)
+/// - KW 45: Mon 04.11 – Sun 10.11
+/// - KW 46: Mon 11.11 – Sun 17.11
+/// - KW 47: Mon 18.11 – Sun 24.11
+/// - KW 48: Mon 25.11 – Sun 01.12  (overlaps into December)
+List<KwSlot> kwSlotsOverlappingMonth(int year, int month) {
+  final firstDay = DateTime(year, month, 1);
+  // DateTime(year, month + 1, 0) gives the last day of [month].
+  final lastDay = DateTime(year, month + 1, 0);
+
+  // Start from the Monday of the week that contains [firstDay].
+  DateTime current = firstDay;
+  if (current.weekday != DateTime.monday) {
+    current = current.subtract(Duration(days: current.weekday - 1));
+  }
+
+  final List<KwSlot> slots = [];
+  while (!current.isAfter(lastDay)) {
+    final sonntag = current.add(const Duration(days: 6));
+    // Include the week if it overlaps the month (sonntag >= firstDay is always
+    // true here since current started from the Monday containing firstDay).
+    slots.add(KwSlot(
+      kwNummer: isoWeekNumber(current),
+      montag: current,
+      sonntag: sonntag,
+    ));
+    current = current.add(const Duration(days: 7));
+  }
+
+  return slots;
+}

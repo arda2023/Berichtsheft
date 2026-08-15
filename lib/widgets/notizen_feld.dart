@@ -73,7 +73,6 @@ class _NotizenFeldState extends State<NotizenFeld> {
           onChanged: _onTextChanged,
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.all(12),
           ),
         ),
       ],

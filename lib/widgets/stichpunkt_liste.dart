@@ -133,8 +133,10 @@ class _StichpunktListeState extends State<StichpunktListe> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close, size: 20, color: Colors.grey),
                     onPressed: () => _removeItem(index),
+                    tooltip: 'Eintrag entfernen',
+                    splashRadius: 20,
                   ),
                 ],
               ),
@@ -149,22 +151,31 @@ class _StichpunktListeState extends State<StichpunktListe> {
         ),
         if (showWarning) ...
           [
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.warning_amber, color: Colors.orange, size: 18),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Achtung: Der Text ist sehr lang und passt evtl. nicht vollständig in die PDF (max. ca. 430 Zeichen empfohlen).',
-                    style: TextStyle(
-                      color: Colors.orange.shade800,
-                      fontSize: 12,
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Achtung: Der Text ist sehr lang und passt evtl. nicht vollständig in die PDF (max. ca. 430 Zeichen empfohlen).',
+                      style: TextStyle(
+                        color: Colors.orange.shade900,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
       ],
