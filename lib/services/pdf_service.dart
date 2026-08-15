@@ -61,7 +61,7 @@ double _fitFontSize(
   List<String> items, {
   double availableHeight = 112,
   double maxFont = 12,
-  double minFont = 6,
+  double minFont = 10,
   double charsPerLine = 45,
 }) {
   if (items.isEmpty) return maxFont;
@@ -245,13 +245,18 @@ List<pw.Page> _buildMonthPages(
       final labelWidget = pw.Column(
         mainAxisSize: pw.MainAxisSize.min,
         crossAxisAlignment: pw.CrossAxisAlignment.center,
+        mainAxisAlignment: pw.MainAxisAlignment.center,
         children: [
           pw.Text(
             'KW : ${slot.kwNummer}',
             style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
           ),
           pw.Text(
-            '${dd(slot.montag)}-${ddyyyy(slot.sonntag)}',
+            '${dd(slot.montag)}-',
+            style: pw.TextStyle(fontSize: 12),
+          ),
+          pw.Text(
+            ddyyyy(slot.sonntag),
             style: pw.TextStyle(fontSize: 12),
           ),
         ],
@@ -429,10 +434,28 @@ List<pw.Page> _buildMonthPages(
     ),
   );
 
-  // RIGHT panel: schultage as-is, then optional schulNotizen.
-  final schulRightChildren = <pw.Widget>[
-    pw.Text(profil.schultage, style: pw.TextStyle(fontSize: 12)),
-  ];
+  // RIGHT panel: schultage split on first ':', then optional schulNotizen.
+  final schulRightChildren = <pw.Widget>[];
+  final schultage = profil.schultage;
+  final colonIdx = schultage.indexOf(':');
+  if (colonIdx >= 0) {
+    final labelPart = schultage.substring(0, colonIdx + 1); // includes ':'
+    final valuePart = schultage.substring(colonIdx + 1).trim();
+    schulRightChildren.add(
+      pw.Text(
+        labelPart,
+        style: pw.TextStyle(
+          fontSize: 12,
+          decoration: pw.TextDecoration.underline,
+        ),
+      ),
+    );
+    if (valuePart.isNotEmpty) {
+      schulRightChildren.add(pw.Text(valuePart, style: pw.TextStyle(fontSize: 12)));
+    }
+  } else {
+    schulRightChildren.add(pw.Text(schultage, style: pw.TextStyle(fontSize: 12)));
+  }
   if (profil.schulNotizen.trim().isNotEmpty) {
     schulRightChildren.add(pw.SizedBox(height: 8));
     schulRightChildren.add(pw.Text(profil.schulNotizen.trim(), style: pw.TextStyle(fontSize: 12)));
@@ -498,18 +521,19 @@ List<pw.Page> _buildMonthPages(
     decoration: _outerBorder(),
     child: pw.Column(
       children: [
-        // Row 1 — empty signature space
+        // Row 1 — tall empty signature space
         pw.Row(children: [
-          pw.Expanded(child: sigCell('', borderRight: true, borderBottom: true)),
-          pw.Expanded(child: sigCell('', borderRight: false, borderBottom: true)),
+          pw.Expanded(child: sigCell('', borderRight: true, borderBottom: true, height: 45)),
+          pw.Expanded(child: sigCell('', borderRight: false, borderBottom: true, height: 45)),
         ]),
-        // Row 2 — labels
+        // Row 2 — short label row
         pw.Row(children: [
           pw.Expanded(
             child: sigCell(
               'Datum, Unterschrift der Auszubildenden',
               borderRight: true,
               borderBottom: true,
+              height: 18,
             ),
           ),
           pw.Expanded(
@@ -517,21 +541,23 @@ List<pw.Page> _buildMonthPages(
               'Datum, Unterschrift der Ausbilderin',
               borderRight: false,
               borderBottom: true,
+              height: 18,
             ),
           ),
         ]),
-        // Row 3 — empty signature space
+        // Row 3 — tall empty signature space
         pw.Row(children: [
-          pw.Expanded(child: sigCell('', borderRight: true, borderBottom: true)),
-          pw.Expanded(child: sigCell('', borderRight: false, borderBottom: true)),
+          pw.Expanded(child: sigCell('', borderRight: true, borderBottom: true, height: 45)),
+          pw.Expanded(child: sigCell('', borderRight: false, borderBottom: true, height: 45)),
         ]),
-        // Row 4 — further endorsements (no bottom border — last row)
+        // Row 4 — short label row (no bottom border — last row)
         pw.Row(children: [
           pw.Expanded(
             child: sigCell(
               'Datum, ggf. weitere Sichtvermerke',
               borderRight: true,
               borderBottom: false,
+              height: 18,
             ),
           ),
           pw.Expanded(
@@ -539,6 +565,7 @@ List<pw.Page> _buildMonthPages(
               'Datum, ggf. weitere Sichtvermerke',
               borderRight: false,
               borderBottom: false,
+              height: 18,
             ),
           ),
         ]),

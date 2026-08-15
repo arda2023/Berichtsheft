@@ -94,6 +94,14 @@ class _StichpunktListeState extends State<StichpunktListe> {
 
   @override
   Widget build(BuildContext context) {
+    // Compute weighted length: chars excluding spaces and hyphens.
+    final weightedLength = widget.items.fold<int>(
+      0,
+      (sum, item) => sum + item.replaceAll(' ', '').replaceAll('-', '').length,
+    );
+    const _warningThreshold = 430;
+    final showWarning = weightedLength > _warningThreshold;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -139,6 +147,26 @@ class _StichpunktListeState extends State<StichpunktListe> {
           icon: const Icon(Icons.add),
           label: const Text('Hinzufügen'),
         ),
+        if (showWarning) ...
+          [
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.warning_amber, color: Colors.orange, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Achtung: Der Text ist sehr lang und passt evtl. nicht vollständig in die PDF (max. ca. 430 Zeichen empfohlen).',
+                    style: TextStyle(
+                      color: Colors.orange.shade800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
       ],
     );
   }
