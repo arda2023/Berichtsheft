@@ -125,9 +125,9 @@ pw.Widget _gridCell(
 ///   • Page 1 — betriebliche Tätigkeiten overview
 ///   • Page 2 — schulische Tätigkeiten + signature grid
 ///
-/// [monthEntries] should contain all [Eintrag] objects whose week overlaps
-/// this month (caller is responsible for filtering). They will be sorted
-/// chronologically internally.
+/// [monthEntries] must contain all [Eintrag] objects whose week belongs to
+/// this month by the Thursday rule (Thursday of the week is in this month).
+/// Each week is shown with its FULL Mon–Sun range, unclipped.
 List<pw.Page> _buildMonthPages(
   int year,
   int month,
@@ -137,14 +137,10 @@ List<pw.Page> _buildMonthPages(
   final sorted = List<Eintrag>.from(monthEntries)
     ..sort((a, b) => a.vonDatum.compareTo(b.vonDatum));
 
-  // Month boundary dates used for display clipping.
-  final firstDay = DateTime(year, month, 1);
-  final lastDay = DateTime(year, month + 1, 0);
+  // Get all weeks belonging to this month by the Thursday rule.
+  final allSlots = kwSlotsByThursdayForMonth(year, month);
 
-  // Get all overlapping slots.
-  final allSlots = kwSlotsOverlappingMonth(year, month);
-
-  // Determine which slots have associated data (betriebliches, schulischesProFach, besonderheiten).
+  // Determine which slots have associated data.
   bool hasData(KwSlot slot) {
     for (final e in sorted) {
       if (isoWeekNumber(e.vonDatum) == slot.kwNummer &&
@@ -166,12 +162,10 @@ List<pw.Page> _buildMonthPages(
   } else {
     final mutable = List<KwSlot>.from(allSlots);
     while (mutable.length > 5) {
-      // Try to remove the last empty slot.
       final lastIdx = mutable.length - 1;
       if (!hasData(mutable[lastIdx])) {
         mutable.removeAt(lastIdx);
       } else {
-        // All remaining are data-bearing; keep first 5.
         break;
       }
     }
@@ -183,7 +177,7 @@ List<pw.Page> _buildMonthPages(
   }
 
   // Reference date for Lehrjahr: 1st of the month.
-  final refDate = firstDay;
+  final refDate = DateTime(year, month, 1);
   final lehrjahr = berechneLehrjahr(refDate, profil.ausbildungsbeginn);
 
   final titleStyle = pw.TextStyle(fontSize: 14);
@@ -279,10 +273,7 @@ List<pw.Page> _buildMonthPages(
     // KW label cell (rotated 90° CCW so text reads bottom-to-top).
     pw.Widget kwLabelCell;
     if (slot != null) {
-      // Clip display dates to the month boundary.
-      final displayVon = slot.montag.isBefore(firstDay) ? firstDay : slot.montag;
-      final displayBis = slot.sonntag.isAfter(lastDay) ? lastDay : slot.sonntag;
-
+      // Full Mon–Sun range, unclipped.
       final labelWidget = pw.Column(
         mainAxisSize: pw.MainAxisSize.min,
         crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -293,11 +284,11 @@ List<pw.Page> _buildMonthPages(
             style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
           ),
           pw.Text(
-            '${dd(displayVon)}-',
+            '${dd(slot.montag)}-',
             style: pw.TextStyle(fontSize: 12),
           ),
           pw.Text(
-            ddyyyy(displayBis),
+            ddyyyy(slot.sonntag),
             style: pw.TextStyle(fontSize: 12),
           ),
         ],
@@ -828,39 +819,25 @@ Future<Uint8List> generateEintraegeRangePdf(
     return doc.save();
   }
 
-  // Helper: collect all distinct (year, month) pages that the given entries
-  // require under the overlap model, then emit those pages.
+  // Helper: group entries by Thursday-rule month, then emit pages.
   void addMonthPages(List<Eintrag> entries) {
-    // For each entry, its week may overlap two months. Collect all (year, month)
-    // keys the entry contributes to.
-    final Set<String> monthKeys = {};
+    // Each entry belongs to exactly one month: the month whose Thursday
+    // (mondayOfEntry + 3 days) falls in.
+    final Map<String, List<Eintrag>> byMonth = {};
     for (final e in entries) {
-      final montag = e.vonDatum.subtract(Duration(days: e.vonDatum.weekday - 1));
-      final sonntag = montag.add(const Duration(days: 6));
-      // The entry belongs to every month it overlaps.
-      final months = <DateTime>[DateTime(montag.year, montag.month, 1)];
-      if (sonntag.month != montag.month || sonntag.year != montag.year) {
-        months.add(DateTime(sonntag.year, sonntag.month, 1));
-      }
-      for (final m in months) {
-        monthKeys.add('${m.year}-${m.month.toString().padLeft(2, '0')}');
-      }
+      final monday = e.vonDatum.subtract(Duration(days: e.vonDatum.weekday - 1));
+      final thursday = monday.add(const Duration(days: 3));
+      final key = '${thursday.year}-${thursday.month.toString().padLeft(2, '0')}';
+      byMonth.putIfAbsent(key, () => []).add(e);
     }
 
     // Emit month pages in chronological order.
-    final keys = monthKeys.toList()..sort();
+    final keys = byMonth.keys.toList()..sort();
     for (final key in keys) {
       final parts = key.split('-');
       final y = int.parse(parts[0]);
       final m = int.parse(parts[1]);
-      // Gather all entries whose week overlaps this (y, m).
-      final firstDay = DateTime(y, m, 1);
-      final lastDay = DateTime(y, m + 1, 0);
-      final group = entries.where((e) {
-        final montag = e.vonDatum.subtract(Duration(days: e.vonDatum.weekday - 1));
-        final sonntag = montag.add(const Duration(days: 6));
-        return !montag.isAfter(lastDay) && !sonntag.isBefore(firstDay);
-      }).toList();
+      final group = byMonth[key]!;
       for (final page in _buildMonthPages(y, m, group, profil)) {
         doc.addPage(page);
       }

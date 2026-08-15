@@ -122,3 +122,42 @@ List<KwSlot> kwSlotsOverlappingMonth(int year, int month) {
 
   return slots;
 }
+
+/// Returns all calendar weeks (Mon–Sun) that belong to [year]/[month] by the
+/// **Thursday rule** (ISO 8601): a week belongs to the month whose Thursday
+/// (monday + 3 days) falls in. Each week appears on exactly ONE month page.
+///
+/// Example: the week Mon 31.08 – Sun 06.09.2026 has its Thursday on 03.09,
+/// so it belongs to September and will show its full date range on that page.
+List<KwSlot> kwSlotsByThursdayForMonth(int year, int month) {
+  final firstDay = DateTime(year, month, 1);
+  final lastDay = DateTime(year, month + 1, 0);
+
+  // Start from the Monday of the week containing the 1st of the month.
+  DateTime current = firstDay;
+  if (current.weekday != DateTime.monday) {
+    current = current.subtract(Duration(days: current.weekday - 1));
+  }
+
+  // We may need to look one extra week before and after the month boundary,
+  // since Thursday-rule weeks can start slightly outside the month. Iterate
+  // from two weeks before to two weeks after to be safe.
+  current = current.subtract(const Duration(days: 7));
+
+  final List<KwSlot> slots = [];
+  // Iterate until current Monday is well past the last day of the month.
+  while (current.isBefore(lastDay.add(const Duration(days: 8)))) {
+    final thursday = current.add(const Duration(days: 3));
+    if (thursday.year == year && thursday.month == month) {
+      slots.add(KwSlot(
+        kwNummer: isoWeekNumber(current),
+        montag: current,
+        sonntag: current.add(const Duration(days: 6)),
+      ));
+    }
+    current = current.add(const Duration(days: 7));
+  }
+
+  return slots;
+}
+
