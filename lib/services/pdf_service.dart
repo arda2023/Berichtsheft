@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../models/eintrag.dart';
 import '../models/profil.dart';
 import '../utils/lehrjahr.dart';
+import '../utils/monats_kws.dart';
 
 const _pageWidth = 595.28;
 const _pageHeight = 841.89;
@@ -16,8 +17,25 @@ const _margin = 36.0;
 
 const _cellPadding = pw.EdgeInsets.all(4);
 final _bold = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
-const _normal = pw.TextStyle(fontSize: 9);
-const _small = pw.TextStyle(fontSize: 8);
+final _normal = pw.TextStyle(fontSize: 9);
+final _small = pw.TextStyle(fontSize: 8);
+
+// German month names, 1-indexed (index 0 unused).
+const _monthNames = [
+  '',
+  'Januar',
+  'Februar',
+  'März',
+  'April',
+  'Mai',
+  'Juni',
+  'Juli',
+  'August',
+  'September',
+  'Oktober',
+  'November',
+  'Dezember',
+];
 
 // ── Shared helper widgets ─────────────────────────────────────────────────────
 
@@ -36,41 +54,386 @@ pw.Widget _itemList(List<String> items, {double fontSize = 9}) {
   );
 }
 
-pw.Widget _signatureBlock(String role) {
-  return pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.center,
-    children: [
-      pw.Container(
-        width: 180,
-        height: 30,
-        decoration: const pw.BoxDecoration(
-          border: pw.Border(
-            bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
-          ),
-        ),
+/// A thin full-border box (0.75pt black).
+pw.BoxDecoration _outerBorder() => pw.BoxDecoration(
+      border: pw.Border.all(width: 0.75, color: PdfColors.black),
+    );
+
+/// Right border only.
+pw.BoxDecoration _rightBorder() => const pw.BoxDecoration(
+      border: pw.Border(
+        right: pw.BorderSide(width: 0.75, color: PdfColors.black),
       ),
-      pw.SizedBox(height: 4),
-      pw.Text('Datum, Unterschrift', style: const pw.TextStyle(fontSize: 8)),
-      pw.Text(role, style: const pw.TextStyle(fontSize: 8)),
-    ],
+    );
+
+/// Bottom border only.
+pw.BoxDecoration _bottomBorder() => const pw.BoxDecoration(
+      border: pw.Border(
+        bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
+      ),
+    );
+
+/// A grid cell with optional right / bottom borders.
+pw.Widget _gridCell(
+  pw.Widget child, {
+  bool borderRight = true,
+  bool borderBottom = true,
+  pw.EdgeInsets padding = _cellPadding,
+}) {
+  return pw.Container(
+    decoration: pw.BoxDecoration(
+      border: pw.Border(
+        right: borderRight
+            ? const pw.BorderSide(width: 0.75, color: PdfColors.black)
+            : pw.BorderSide.none,
+        bottom: borderBottom
+            ? const pw.BorderSide(width: 0.75, color: PdfColors.black)
+            : pw.BorderSide.none,
+      ),
+    ),
+    padding: padding,
+    child: child,
   );
 }
 
-// ── Private page builder ──────────────────────────────────────────────────────
+// ── Two-page-per-month builder ────────────────────────────────────────────────
 
-pw.Page _buildEintragPage(Eintrag eintrag, Profil profil) {
-  final dateFormat = DateFormat('dd.MM.yyyy');
+/// Builds exactly 2 [pw.Page]s for the given [year]/[month]:
+///   • Page 1 — betriebliche Tätigkeiten overview
+///   • Page 2 — schulische Tätigkeiten + signature grid
+///
+/// [monthEntries] should contain all [Eintrag] objects whose [vonDatum] falls
+/// in this month (caller is responsible for filtering). They will be sorted
+/// chronologically internally.
+List<pw.Page> _buildMonthPages(
+  int year,
+  int month,
+  List<Eintrag> monthEntries,
+  Profil profil,
+) {
+  final sorted = List<Eintrag>.from(monthEntries)
+    ..sort((a, b) => a.vonDatum.compareTo(b.vonDatum));
 
-  // Compute Lehrjahr dynamically based on training start date
-  final lehrjahr = berechneLehrjahr(eintrag.vonDatum, profil.ausbildungsbeginn);
+  final slots = kwSlotsForMonth(year, month);
 
-  // ── Grid cell helper ──────────────────────────────────────────────────────
-  pw.Widget gridCell(
-    pw.Widget child, {
+  // Pad to exactly 5 slots (empty nulls for missing rows).
+  final List<KwSlot?> rows = List<KwSlot?>.from(slots.take(5));
+  while (rows.length < 5) {
+    rows.add(null);
+  }
+
+  // Reference date for Lehrjahr: first Monday of the month (first slot).
+  final refDate = slots.isNotEmpty ? slots.first.montag : DateTime(year, month, 1);
+  final lehrjahr = berechneLehrjahr(refDate, profil.ausbildungsbeginn);
+
+  final titleStyle = pw.TextStyle(fontSize: 14);
+  final headerBarStyle = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11);
+  final infoLabelStyle = pw.TextStyle(fontSize: 11);
+  final infoValueStyle = pw.TextStyle(fontSize: 11);
+
+  // ── Helper: format dd.MM ────────────────────────────────────────────────────
+  String dd(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}';
+  String ddyyyy(DateTime d) => '${dd(d)}.${d.year}';
+
+  // ── Helper: find Eintrag matching a KwSlot ──────────────────────────────────
+  Eintrag? entryForSlot(KwSlot slot) {
+    for (final e in sorted) {
+      if (isoWeekNumber(e.vonDatum) == slot.kwNummer &&
+          e.vonDatum.year == slot.montag.year) {
+        return e;
+      }
+    }
+    return null;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PAGE 1 — betriebliche Tätigkeiten
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── 1. Title ───────────────────────────────────────────────────────────────
+  final title = pw.Center(
+    child: pw.Text(
+      'Ausbildungsnachweis [${_monthNames[month]}; $year]',
+      style: titleStyle,
+    ),
+  );
+
+  // ── 2. Info table (4 rows, label ~48% | value ~52%) ────────────────────────
+  final infoRows = [
+    ('Name des Auszubildenden:', profil.name),
+    ('Ausbildungsjahr:', lehrjahr?.toString() ?? ''),
+    ('Ausbildungsberuf:', profil.ausbildungsberuf),
+    ('Abteilung:', profil.ausbildungsbereich),
+  ];
+
+  final infoTable = pw.Container(
+    decoration: _outerBorder(),
+    child: pw.Column(
+      children: List.generate(infoRows.length, (i) {
+        final isLast = i == infoRows.length - 1;
+        return pw.Row(children: [
+          pw.Expanded(
+            flex: 48,
+            child: _gridCell(
+              pw.Text(infoRows[i].$1, style: infoLabelStyle),
+              borderRight: true,
+              borderBottom: !isLast,
+            ),
+          ),
+          pw.Expanded(
+            flex: 52,
+            child: _gridCell(
+              pw.Text(infoRows[i].$2, style: infoValueStyle),
+              borderRight: false,
+              borderBottom: !isLast,
+            ),
+          ),
+        ]);
+      }),
+    ),
+  );
+
+  // ── 3. Section header bar ──────────────────────────────────────────────────
+  final betriebHeader = pw.Container(
+    decoration: _outerBorder(),
+    padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+    child: pw.Center(
+      child: pw.Text('betriebliche Tätigkeiten', style: headerBarStyle),
+    ),
+  );
+
+  // ── 4. Main table (LEFT 72% | RIGHT 28%), fixed height 600pt ───────────────
+  const mainTableHeight = 600.0;
+  const kwLabelWidth = 55.0;
+
+  // Build 5 KW rows for the LEFT panel.
+  final List<pw.Widget> kwRowWidgets = [];
+  for (int i = 0; i < 5; i++) {
+    final slot = rows[i];
+    final entry = slot != null ? entryForSlot(slot) : null;
+    final isLast = i == 4;
+
+    // KW label cell (rotated 90° CCW so text reads bottom-to-top).
+    pw.Widget kwLabelCell;
+    if (slot != null) {
+      final labelWidget = pw.Column(
+        mainAxisSize: pw.MainAxisSize.min,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Text(
+            'KW : ${slot.kwNummer}',
+            style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.Text(
+            '${dd(slot.montag)}-${ddyyyy(slot.sonntag)}',
+            style: pw.TextStyle(fontSize: 6),
+          ),
+        ],
+      );
+      kwLabelCell = pw.Container(
+        width: kwLabelWidth,
+        decoration: _rightBorder(),
+        child: pw.Center(
+          child: pw.Transform.rotateBox(
+            angle: 1.5708, // 90° CCW (π/2)
+            child: labelWidget,
+          ),
+        ),
+      );
+    } else {
+      kwLabelCell = pw.Container(
+        width: kwLabelWidth,
+        decoration: _rightBorder(),
+      );
+    }
+
+    // Content cell (betriebliche Tätigkeiten).
+    final contentCell = pw.Expanded(
+      child: pw.Container(
+        padding: _cellPadding,
+        alignment: pw.Alignment.topLeft,
+        child: entry != null ? _itemList(entry.betriebliches) : pw.SizedBox(),
+      ),
+    );
+
+    kwRowWidgets.add(
+      pw.Expanded(
+        child: pw.Container(
+          decoration: isLast ? null : _bottomBorder(),
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              kwLabelCell,
+              contentCell,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  final leftPanel = pw.Expanded(
+    flex: 72,
+    child: pw.Container(
+      decoration: _rightBorder(),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: kwRowWidgets,
+      ),
+    ),
+  );
+
+  // RIGHT panel — Wochenstunden, Pause, Arbeitszeiten, Besonderheiten.
+  // NOTE: Profil does not have wochenstunden/pause/arbeitszeiten fields.
+  // We render the available data: pauseMinuten from entries and
+  // Krankheit/Urlaub Besonderheiten from entries.
+  final List<pw.Widget> rightItems = [
+    pw.Text('Besonderheiten:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+    pw.SizedBox(height: 6),
+  ];
+
+  bool anyBesonderheit = false;
+  for (final e in sorted) {
+    if (e.krankheitstage > 0) {
+      rightItems.add(pw.Text(
+        'Krankheit: ${e.krankheitstage} Tg (KW ${isoWeekNumber(e.vonDatum)})',
+        style: pw.TextStyle(fontSize: 10),
+      ));
+      rightItems.add(pw.SizedBox(height: 2));
+      anyBesonderheit = true;
+    }
+    if (e.urlaubstage > 0) {
+      rightItems.add(pw.Text(
+        'Urlaub: ${e.urlaubstage} Tg (KW ${isoWeekNumber(e.vonDatum)})',
+        style: pw.TextStyle(fontSize: 10),
+      ));
+      rightItems.add(pw.SizedBox(height: 2));
+      anyBesonderheit = true;
+    }
+  }
+  if (!anyBesonderheit) {
+    rightItems.add(pw.Text('—', style: pw.TextStyle(fontSize: 10)));
+  }
+
+  final rightPanel = pw.Expanded(
+    flex: 28,
+    child: pw.Container(
+      padding: _cellPadding,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: rightItems,
+      ),
+    ),
+  );
+
+  final mainTable = pw.Container(
+    height: mainTableHeight,
+    decoration: _outerBorder(),
+    child: pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [leftPanel, rightPanel],
+    ),
+  );
+
+  final page1 = pw.Page(
+    pageFormat: const PdfPageFormat(_pageWidth, _pageHeight),
+    margin: const pw.EdgeInsets.all(_margin),
+    build: (pw.Context context) {
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          title,
+          pw.SizedBox(height: 12),
+          infoTable,
+          pw.SizedBox(height: 15),
+          betriebHeader,
+          pw.SizedBox(height: 8),
+          mainTable,
+        ],
+      );
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PAGE 2 — schulische Tätigkeiten + signature grid
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── 1. Section header ──────────────────────────────────────────────────────
+  final schulHeader = pw.Container(
+    decoration: _outerBorder(),
+    padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+    child: pw.Center(
+      child: pw.Text('schulische Tätigkeiten', style: headerBarStyle),
+    ),
+  );
+
+  // ── 2. Schulische content table (LEFT 68% | RIGHT 32%), 380pt ─────────────
+  const schulTableHeight = 380.0;
+
+  // Merge all schulisches items from all month entries.
+  final List<String> allSchulisches = [];
+  for (final e in sorted) {
+    allSchulisches.addAll(e.schulisches);
+  }
+
+  final schulLeftPanel = pw.Expanded(
+    flex: 68,
+    child: pw.Container(
+      decoration: _rightBorder(),
+      padding: _cellPadding,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text('Schulische Tätigkeiten:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+          pw.SizedBox(height: 6),
+          _itemList(allSchulisches, fontSize: 10),
+        ],
+      ),
+    ),
+  );
+
+  final schulRightPanel = pw.Expanded(
+    flex: 32,
+    child: pw.Container(
+      padding: _cellPadding,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            profil.fachrichtung.isNotEmpty ? profil.fachrichtung : '—',
+            style: pw.TextStyle(fontSize: 10),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  final schulTable = pw.Container(
+    height: schulTableHeight,
+    decoration: _outerBorder(),
+    child: pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [schulLeftPanel, schulRightPanel],
+    ),
+  );
+
+  // ── 3. Confirmation paragraph ─────────────────────────────────────────────
+  final confirmationText = pw.Text(
+    'Durch die nachfolgenden Unterschriften wird die Richtigkeit und Vollständigkeit der obigen Angaben bestätigt.',
+    style: pw.TextStyle(fontSize: 11),
+  );
+
+  // ── 4. Signature grid (2 columns × 4 rows, each ~35pt tall) ───────────────
+  // Row layout: empty | empty / label1 | label2 / empty | empty / label3 | label4
+  pw.Widget sigCell(
+    String text, {
     bool borderRight = true,
     bool borderBottom = true,
+    double height = 35,
   }) {
     return pw.Container(
+      height: height,
       decoration: pw.BoxDecoration(
         border: pw.Border(
           right: borderRight
@@ -81,83 +444,59 @@ pw.Page _buildEintragPage(Eintrag eintrag, Profil profil) {
               : pw.BorderSide.none,
         ),
       ),
-      padding: _cellPadding,
-      child: child,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: text.isNotEmpty
+          ? pw.Align(
+              alignment: pw.Alignment.bottomLeft,
+              child: pw.Text(text, style: pw.TextStyle(fontSize: 9)),
+            )
+          : pw.SizedBox(),
     );
   }
 
-  // ── 1. Header block ───────────────────────────────────────────────────────
-  final headerBlock = pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(width: 0.75, color: PdfColors.black),
-    ),
+  final signatureGrid = pw.Container(
+    decoration: _outerBorder(),
     child: pw.Column(
       children: [
-        // Row 1: Name (spans full width)
+        // Row 1 — empty signature space
+        pw.Row(children: [
+          pw.Expanded(child: sigCell('', borderRight: true, borderBottom: true)),
+          pw.Expanded(child: sigCell('', borderRight: false, borderBottom: true)),
+        ]),
+        // Row 2 — labels
         pw.Row(children: [
           pw.Expanded(
-            flex: 25,
-            child: gridCell(pw.Text('Name, Vorname:', style: _bold)),
+            child: sigCell(
+              'Datum, Unterschrift der Auszubildenden',
+              borderRight: true,
+              borderBottom: true,
+            ),
           ),
           pw.Expanded(
-            flex: 75,
-            child: gridCell(
-              pw.Text(profil.name, style: _normal),
+            child: sigCell(
+              'Datum, Unterschrift der Ausbilderin',
               borderRight: false,
+              borderBottom: true,
             ),
           ),
         ]),
-        // Row 2: Lehrjahr + Ausbildungsbereich
+        // Row 3 — empty signature space
         pw.Row(children: [
-          pw.Expanded(
-            flex: 25,
-            child: gridCell(pw.Text('Lehrjahr:', style: _bold)),
-          ),
-          pw.Expanded(
-            flex: 12,
-            child: gridCell(
-              pw.Text(lehrjahr?.toString() ?? '', style: _normal),
-            ),
-          ),
-          pw.Expanded(
-            flex: 28,
-            child: gridCell(pw.Text('Ausbildungsbereich:', style: _bold)),
-          ),
-          pw.Expanded(
-            flex: 35,
-            child: gridCell(
-              pw.Text(profil.ausbildungsbereich, style: _normal),
-              borderRight: false,
-            ),
-          ),
+          pw.Expanded(child: sigCell('', borderRight: true, borderBottom: true)),
+          pw.Expanded(child: sigCell('', borderRight: false, borderBottom: true)),
         ]),
-        // Row 3: Ausbildungswoche + Bis (no bottom border — last row)
+        // Row 4 — further endorsements (no bottom border — last row)
         pw.Row(children: [
           pw.Expanded(
-            flex: 25,
-            child: gridCell(
-              pw.Text('Ausbildungswoche:', style: _bold),
+            child: sigCell(
+              'Datum, ggf. weitere Sichtvermerke',
+              borderRight: true,
               borderBottom: false,
             ),
           ),
           pw.Expanded(
-            flex: 20,
-            child: gridCell(
-              pw.Text(dateFormat.format(eintrag.vonDatum), style: _normal),
-              borderBottom: false,
-            ),
-          ),
-          pw.Expanded(
-            flex: 8,
-            child: gridCell(
-              pw.Text('Bis:', style: _bold),
-              borderBottom: false,
-            ),
-          ),
-          pw.Expanded(
-            flex: 47,
-            child: gridCell(
-              pw.Text(dateFormat.format(eintrag.bisDatum), style: _normal),
+            child: sigCell(
+              'Datum, ggf. weitere Sichtvermerke',
               borderRight: false,
               borderBottom: false,
             ),
@@ -167,130 +506,26 @@ pw.Page _buildEintragPage(Eintrag eintrag, Profil profil) {
     ),
   );
 
-  // ── 2. Content block ──────────────────────────────────────────────────────
-
-  const contentBlockHeight = 460.0;
-
-  final leftColumn = pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-    children: [
-      pw.Container(
-        padding: _cellPadding,
-        decoration: const pw.BoxDecoration(
-          border: pw.Border(
-            bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
-          ),
-        ),
-        child: pw.Text('Betriebliche Tätigkeiten', style: _bold),
-      ),
-      pw.Expanded(
-        child: pw.Container(
-          padding: _cellPadding,
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(
-              bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
-            ),
-          ),
-          alignment: pw.Alignment.topLeft,
-          child: _itemList(eintrag.betriebliches),
-        ),
-      ),
-      pw.Container(
-        padding: _cellPadding,
-        decoration: const pw.BoxDecoration(
-          border: pw.Border(
-            bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
-          ),
-        ),
-        child: pw.Text('Schulische Tätigkeiten', style: _bold),
-      ),
-      pw.Expanded(
-        child: pw.Container(
-          padding: _cellPadding,
-          alignment: pw.Alignment.topLeft,
-          child: _itemList(eintrag.schulisches),
-        ),
-      ),
-    ],
-  );
-
-  final rightColumn = pw.Container(
-    padding: _cellPadding,
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text('Zusatz', style: _bold),
-        pw.SizedBox(height: 6),
-        pw.Text('Pause: ${eintrag.pauseMinuten} Min', style: _small),
-        pw.SizedBox(height: 2),
-        pw.Text('Krank: ${eintrag.krankheitstage} Tg', style: _small),
-        pw.SizedBox(height: 2),
-        pw.Text('Urlaub: ${eintrag.urlaubstage} Tg', style: _small),
-        if (eintrag.notizen.isNotEmpty) ...[
-          pw.SizedBox(height: 8),
-          pw.Text(
-            'Notizen:',
-            style: pw.TextStyle(
-              fontSize: 8,
-              fontWeight: pw.FontWeight.bold,
-            ),
-          ),
-          pw.SizedBox(height: 2),
-          pw.Text(eintrag.notizen, style: _small),
-        ],
-      ],
-    ),
-  );
-
-  final contentBlock = pw.Container(
-    height: contentBlockHeight,
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(width: 0.75, color: PdfColors.black),
-    ),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-      children: [
-        pw.Expanded(
-          flex: 5,
-          child: pw.Container(
-            decoration: const pw.BoxDecoration(
-              border: pw.Border(
-                right: pw.BorderSide(width: 0.75, color: PdfColors.black),
-              ),
-            ),
-            child: leftColumn,
-          ),
-        ),
-        pw.Expanded(flex: 1, child: rightColumn),
-      ],
-    ),
-  );
-
-  // ── 3. Signature row ──────────────────────────────────────────────────────
-  final signatureRow = pw.Row(
-    mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
-    children: [
-      _signatureBlock('Auszubildender'),
-      _signatureBlock('Ausbilderin'),
-    ],
-  );
-
-  return pw.Page(
+  final page2 = pw.Page(
     pageFormat: const PdfPageFormat(_pageWidth, _pageHeight),
     margin: const pw.EdgeInsets.all(_margin),
     build: (pw.Context context) {
       return pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          headerBlock,
-          pw.SizedBox(height: 15),
-          contentBlock,
-          pw.SizedBox(height: 100),
-          signatureRow,
+          schulHeader,
+          pw.SizedBox(height: 8),
+          schulTable,
+          pw.SizedBox(height: 20),
+          confirmationText,
+          pw.SizedBox(height: 10),
+          signatureGrid,
         ],
       );
     },
   );
+
+  return [page1, page2];
 }
 
 // ── Cover page builder ────────────────────────────────────────────────────────
@@ -426,24 +661,37 @@ pw.Page _buildDeckblattPage({int? lehrjahr, required Profil profil}) {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/// Generates a single-page PDF for one [Eintrag].
+/// Generates a two-page PDF for the month of [eintrag.vonDatum].
+///
+/// Only [eintrag] is used as month data, so only its KW row will be filled.
 Future<Uint8List> generateEintragPdf(Eintrag eintrag, Profil profil) async {
   final doc = pw.Document();
-  doc.addPage(_buildEintragPage(eintrag, profil));
+  final pages = _buildMonthPages(
+    eintrag.vonDatum.year,
+    eintrag.vonDatum.month,
+    [eintrag],
+    profil,
+  );
+  for (final page in pages) {
+    doc.addPage(page);
+  }
   return doc.save();
 }
 
-/// Generates a multi-page PDF with one page per entry in [eintraege].
+/// Generates a multi-page PDF — 2 pages per calendar month — for all [eintraege].
 ///
-/// If [eintraege] is empty, returns a single-page PDF with a placeholder message.
+/// Entries are grouped by year+month of [vonDatum]. Each group produces exactly
+/// 2 pages (page 1: betriebliche Tätigkeiten; page 2: schulische Tätigkeiten +
+/// signature grid).
 ///
-/// If [includeDeckblatt] is true and [eintraege] is non-empty, entries are grouped
-/// by their computed Lehrjahr number (via [berechneLehrjahr]). Groups are ordered
-/// descending (highest/most-recent Lehrjahr first). For each group a dedicated
-/// cover page is prepended, followed by that group's entries in ascending date order.
-/// Entries with an undetermined Lehrjahr (null) are placed last without a cover page.
+/// If [eintraege] is empty, returns a single placeholder page.
 ///
-/// If [includeDeckblatt] is false, all entry pages are added in ascending date order.
+/// If [includeDeckblatt] is true, entries are additionally grouped by Lehrjahr
+/// (via [berechneLehrjahr]). Lehrjahr groups are ordered **descending**
+/// (most-recent first). Before each Lehrjahr group's month-pages, one
+/// [_buildDeckblattPage] cover page is prepended. Within a Lehrjahr group,
+/// months are ordered **ascending**. Entries whose Lehrjahr cannot be
+/// determined (null) are appended last, without a cover page.
 Future<Uint8List> generateEintraegeRangePdf(
   List<Eintrag> eintraege,
   Profil profil, {
@@ -464,43 +712,57 @@ Future<Uint8List> generateEintraegeRangePdf(
         ),
       ),
     );
-  } else if (!includeDeckblatt) {
-    // No cover pages — just emit all entry pages in ascending date order.
-    final sorted = List<Eintrag>.from(eintraege)
+    return doc.save();
+  }
+
+  // Helper: group a sorted list of entries by (year, month) and emit month pages.
+  void addMonthPages(List<Eintrag> entries) {
+    // Sort ascending.
+    final sorted = List<Eintrag>.from(entries)
       ..sort((a, b) => a.vonDatum.compareTo(b.vonDatum));
-    for (final eintrag in sorted) {
-      doc.addPage(_buildEintragPage(eintrag, profil));
+
+    // Group by year+month key.
+    final Map<String, List<Eintrag>> byMonth = {};
+    for (final e in sorted) {
+      final key = '${e.vonDatum.year}-${e.vonDatum.month.toString().padLeft(2, '0')}';
+      byMonth.putIfAbsent(key, () => []).add(e);
     }
+
+    // Emit in chronological order.
+    final keys = byMonth.keys.toList()..sort();
+    for (final key in keys) {
+      final group = byMonth[key]!;
+      final year = group.first.vonDatum.year;
+      final month = group.first.vonDatum.month;
+      for (final page in _buildMonthPages(year, month, group, profil)) {
+        doc.addPage(page);
+      }
+    }
+  }
+
+  if (!includeDeckblatt) {
+    addMonthPages(eintraege);
   } else {
-    // Group entries by Lehrjahr number.
-    final Map<int?, List<Eintrag>> groups = {};
-    for (final eintrag in eintraege) {
-      final lj = berechneLehrjahr(eintrag.vonDatum, profil.ausbildungsbeginn);
-      groups.putIfAbsent(lj, () => []).add(eintrag);
+    // Group by Lehrjahr.
+    final Map<int?, List<Eintrag>> ljGroups = {};
+    for (final e in eintraege) {
+      final lj = berechneLehrjahr(e.vonDatum, profil.ausbildungsbeginn);
+      ljGroups.putIfAbsent(lj, () => []).add(e);
     }
 
-    // Sort each group's entries in ascending date order.
-    for (final list in groups.values) {
-      list.sort((a, b) => a.vonDatum.compareTo(b.vonDatum));
-    }
-
-    // Collect non-null group keys, sorted descending (most recent first).
-    final sortedKeys = groups.keys.whereType<int>().toList()
+    // Sort non-null Lehrjahr keys descending.
+    final sortedKeys = ljGroups.keys.whereType<int>().toList()
       ..sort((a, b) => b.compareTo(a));
 
-    // Emit cover page + entries for each identified Lehrjahr group.
+    // Emit cover page + month pages for each Lehrjahr group.
     for (final lj in sortedKeys) {
       doc.addPage(_buildDeckblattPage(lehrjahr: lj, profil: profil));
-      for (final eintrag in groups[lj]!) {
-        doc.addPage(_buildEintragPage(eintrag, profil));
-      }
+      addMonthPages(ljGroups[lj]!);
     }
 
-    // Entries with null Lehrjahr (ausbildungsbeginn not set) go last, no cover.
-    if (groups.containsKey(null)) {
-      for (final eintrag in groups[null]!) {
-        doc.addPage(_buildEintragPage(eintrag, profil));
-      }
+    // Null Lehrjahr entries go last, no cover page.
+    if (ljGroups.containsKey(null)) {
+      addMonthPages(ljGroups[null]!);
     }
   }
 
